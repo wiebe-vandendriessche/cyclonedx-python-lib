@@ -29,17 +29,22 @@ This set of classes represents the model card types in the CycloneDX standard.
 
 from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Optional, Union
+from json import loads as _json_loads
+from typing import TYPE_CHECKING, Any, Optional, Union
+from xml.etree.ElementTree import Element as _XmlElement  # nosec B405
 
 import py_serializable as serializable
 from sortedcontainers import SortedSet
+from typing_extensions import TypeAlias
 
 from .._internal.bom_ref import bom_ref_from_str as _bom_ref_from_str
 from .._internal.compare import ComparableTuple as _ComparableTuple
 from ..schema.schema import SchemaVersion1Dot5, SchemaVersion1Dot6, SchemaVersion1Dot7
-from . import AttachedText, ExternalReference, Property
+from . import ExternalReference, Property, XsUri
 from .bom_ref import BomRef
 from .contact import OrganizationalEntity
+from .data import ComponentData
+from .graphics import GraphicsCollection
 
 
 @serializable.serializable_enum
@@ -135,6 +140,180 @@ class InputOutputMLParameters:
 
 
 @serializable.serializable_class(ignore_unknown_during_deserialization=True)
+class DatasetReference:
+    """Represents a dataset reference entry within `modelParameters.datasets`.
+
+    The underlying schema allows either a local `bom-ref` reference (refLinkType) or a BOM-Link
+    element reference (bomLinkElementType). This class stores the reference value and supports
+    (de-)serialization to both JSON and XML forms.
+    """
+
+    def __init__(self, *, ref: Union[str, BomRef, XsUri]) -> None:
+        self.ref = ref
+
+    @property
+    @serializable.json_name('ref')
+    @serializable.xml_name('ref')
+    def ref(self) -> Union[str, BomRef, XsUri]:
+        return self._ref
+
+    @ref.setter
+    def ref(self, ref: Union[str, BomRef, XsUri]) -> None:
+        self._ref = ref
+
+    def __comparable_tuple(self) -> _ComparableTuple:
+        v = self.ref
+        if isinstance(v, (BomRef, XsUri)):
+            v = str(v)
+        return _ComparableTuple((v,))
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, DatasetReference):
+            return self.__comparable_tuple() == other.__comparable_tuple()
+        return False
+
+    def __lt__(self, other: Any) -> bool:
+        if isinstance(other, DatasetReference):
+            return self.__comparable_tuple() < other.__comparable_tuple()
+        if isinstance(other, ComponentData):
+            # Place inline ComponentData before references for deterministic ordering
+            return False
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.__comparable_tuple())
+
+    def __repr__(self) -> str:
+        return f'<DatasetReference ref={self.ref!r}>'
+
+    def __gt__(self, other: Any) -> bool:
+        if isinstance(other, DatasetReference):
+            return self.__comparable_tuple() > other.__comparable_tuple()
+        if isinstance(other, ComponentData):
+            # Reference sorts after inline dataset
+            return True
+        return NotImplemented
+
+
+# Mirror license.py approach: provide a Union alias and a repository wrapper
+Dataset: TypeAlias = Union[DatasetReference, ComponentData]
+"""TypeAlias for dataset item entries within model parameters.
+
+- :class:`~cyclonedx.model.model_card.DatasetReference` (ref to dataset via bom-ref or BOM-Link)
+- :class:`~cyclonedx.model.data.ComponentData` (inline dataset definition)
+"""
+
+if TYPE_CHECKING:
+    class DatasetRepository(SortedSet[Dataset]):
+        """Collection of :class:`Dataset` items.
+
+        This is a set; order must not matter here. It accepts both
+        inline :class:`ComponentData` and :class:`DatasetReference` entries.
+        """
+else:
+    class DatasetRepository(SortedSet):
+        """Collection of :class:`Dataset` items.
+
+        Runtime variant without parametric typing to avoid issues with
+        serializers introspecting Unions in container annotations.
+        """
+
+
+class _DatasetRepositorySerializationHelper(serializable.helpers.BaseHelper):
+    """THIS CLASS IS NON-PUBLIC API.
+
+    Handles the union choice for `modelParameters.datasets[*]` items between inline `ComponentData`
+    and a reference object with `ref` that can be either a local `bom-ref` or a BOM-Link URI.
+    """
+
+    @staticmethod
+    def _ref_to_str(ref: Union[str, BomRef, XsUri]) -> str:
+        if isinstance(ref, BomRef):
+            return BomRef.serialize(ref) or ''
+        if isinstance(ref, XsUri):
+            return XsUri.serialize(ref)
+        return str(ref)
+
+    @staticmethod
+    def _str_to_ref(value: str) -> Union[BomRef, XsUri]:
+        if value.startswith('urn:cdx:'):
+            return XsUri(uri=value)
+        return BomRef(value=value)
+
+    @classmethod
+    def json_normalize(
+        cls,
+        o: DatasetRepository, *,
+        view: Optional[type[serializable.ViewType]],
+        **__: Any
+    ) -> Any:
+        if len(o) == 0:
+            return None
+        items: list[Any] = []
+        for it in o:
+            if isinstance(it, ComponentData):
+                items.append(_json_loads(it.as_json(view_=view)))  # type: ignore[attr-defined]
+            elif isinstance(it, DatasetReference):
+                items.append({
+                    'ref': cls._ref_to_str(it.ref)
+                })
+        return items
+
+    @classmethod
+    def json_denormalize(
+        cls,
+        o: list[dict[str, Any]],
+        **__: Any
+    ) -> DatasetRepository:
+        items: DatasetRepository = DatasetRepository()
+        for it in o:
+            if isinstance(it, dict) and 'ref' in it:
+                items.add(DatasetReference(ref=cls._str_to_ref(str(it['ref']))))
+            else:
+                items.add(ComponentData.from_json(it))  # type: ignore[attr-defined]
+        return items
+
+    @classmethod
+    def xml_normalize(
+        cls,
+        o: DatasetRepository, *,
+        element_name: str,
+        view: Optional[type[serializable.ViewType]],
+        xmlns: Optional[str],
+        **__: Any
+    ) -> Optional[_XmlElement]:
+        if len(o) == 0:
+            return None
+        root = _XmlElement(element_name)
+        for it in o:
+            if isinstance(it, ComponentData):
+                root.append(it.as_xml(  # type: ignore[attr-defined]
+                            view_=view, as_string=False, element_name='dataset',
+                            xmlns=xmlns))
+            elif isinstance(it, DatasetReference):
+                child = _XmlElement('ref') if xmlns is None else _XmlElement(f'{{{xmlns}}}ref')
+                child.text = cls._ref_to_str(it.ref)
+                root.append(child)
+        return root
+
+    @classmethod
+    def xml_denormalize(
+        cls,
+        o: _XmlElement,
+        default_ns: Optional[str],
+        **__: Any
+    ) -> DatasetRepository:
+        items: DatasetRepository = DatasetRepository()
+        for child in o:
+            tag = child.tag if default_ns is None else child.tag.replace(f'{{{default_ns}}}', '')
+            if tag == 'dataset':
+                items.add(ComponentData.from_xml(child, default_ns))  # type: ignore[attr-defined]
+            elif tag == 'ref':
+                items.add(DatasetReference(ref=cls._str_to_ref(child.text or '')))
+        return items
+
+
+@serializable.serializable_class(ignore_unknown_during_deserialization=True)
 class ModelParameters:
     """`modelParameters` block within `modelCard`."""
 
@@ -144,7 +323,7 @@ class ModelParameters:
             task: Optional[str] = None,
             architecture_family: Optional[str] = None,
             model_architecture: Optional[str] = None,
-            datasets: Optional[Iterable[Any]] = None,  # Unsupported placeholder until #913 lands.
+            datasets: Optional[Iterable[Dataset]] = None,
             inputs: Optional[Iterable[InputOutputMLParameters]] = None,
             outputs: Optional[Iterable[InputOutputMLParameters]] = None,
     ) -> None:
@@ -152,14 +331,8 @@ class ModelParameters:
         self.task = task
         self.architecture_family = architecture_family
         self.model_architecture = model_architecture
-        # datasets: The CycloneDX spec allows inline componentData or ref entries.
-        # This library has not yet implemented component.data (#913). To avoid emitting
-        # invalid or partial structures, any attempt to populate datasets is rejected.
-        if datasets and len(list(datasets)) > 0:
-            raise NotImplementedError(
-                'modelParameters.datasets is not yet supported. Tracked by issue #913.'
-            )
-        self._datasets: 'SortedSet[Any]' = SortedSet()  # always empty until implemented
+        # Store with precise typing; getter uses repository wrapper like licenses.
+        self._datasets: DatasetRepository = DatasetRepository(datasets or [])
         self.inputs = inputs or []
         self.outputs = outputs or []
 
@@ -220,8 +393,20 @@ class ModelParameters:
     def model_architecture(self, model_architecture: Optional[str]) -> None:
         self._model_architecture = model_architecture
 
-    # datasets intentionally omitted from serialization until #913 implemented.
-    # A future implementation will add a concrete union type and proper annotations.
+    @property
+    @serializable.view(SchemaVersion1Dot5)
+    @serializable.view(SchemaVersion1Dot6)
+    @serializable.view(SchemaVersion1Dot7)
+    @serializable.xml_sequence(5)
+    @serializable.json_name('datasets')
+    @serializable.xml_name('datasets')
+    @serializable.type_mapping(_DatasetRepositorySerializationHelper)
+    def datasets(self) -> DatasetRepository:
+        return self._datasets
+
+    @datasets.setter
+    def datasets(self, datasets: Iterable[Dataset]) -> None:
+        self._datasets = DatasetRepository(datasets)
 
     @property
     @serializable.view(SchemaVersion1Dot5)
@@ -430,113 +615,7 @@ class PerformanceMetric:
         return f'<PerformanceMetric type={self.type!r} value={self.value!r}>'
 
 
-@serializable.serializable_class(ignore_unknown_during_deserialization=True)
-class Graphic:
-    """Graphic entry with optional name and image (AttachedText)."""
-
-    def __init__(self, *, name: Optional[str] = None, image: Optional[AttachedText] = None) -> None:
-        self.name = name
-        self.image = image
-
-    @property
-    @serializable.view(SchemaVersion1Dot5)
-    @serializable.view(SchemaVersion1Dot6)
-    @serializable.view(SchemaVersion1Dot7)
-    @serializable.xml_sequence(1)
-    @serializable.xml_string(serializable.XmlStringSerializationType.NORMALIZED_STRING)
-    def name(self) -> Optional[str]:
-        return self._name
-
-    @name.setter
-    def name(self, name: Optional[str]) -> None:
-        self._name = name
-
-    @property
-    @serializable.view(SchemaVersion1Dot5)
-    @serializable.view(SchemaVersion1Dot6)
-    @serializable.view(SchemaVersion1Dot7)
-    @serializable.xml_sequence(2)
-    def image(self) -> Optional[AttachedText]:
-        return self._image
-
-    @image.setter
-    def image(self, image: Optional[AttachedText]) -> None:
-        self._image = image
-
-    def __comparable_tuple(self) -> _ComparableTuple:
-        return _ComparableTuple((self.name, self.image))
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, Graphic):
-            return self.__comparable_tuple() == other.__comparable_tuple()
-        return False
-
-    def __lt__(self, other: Any) -> bool:
-        if isinstance(other, Graphic):
-            return self.__comparable_tuple() < other.__comparable_tuple()
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        return hash(self.__comparable_tuple())
-
-    def __repr__(self) -> str:
-        return f'<Graphic name={self.name!r}>'
-
-
-@serializable.serializable_class(ignore_unknown_during_deserialization=True)
-class GraphicsCollection:
-    """A collection of graphics with optional description."""
-
-    def __init__(self, *, description: Optional[str] = None, collection: Optional[Iterable[Graphic]] = None) -> None:
-        self.description = description
-        self.collection = collection or []
-
-    @property
-    @serializable.view(SchemaVersion1Dot5)
-    @serializable.view(SchemaVersion1Dot6)
-    @serializable.view(SchemaVersion1Dot7)
-    @serializable.xml_sequence(1)
-    @serializable.xml_string(serializable.XmlStringSerializationType.NORMALIZED_STRING)
-    def description(self) -> Optional[str]:
-        return self._description
-
-    @description.setter
-    def description(self, description: Optional[str]) -> None:
-        self._description = description
-
-    @property
-    @serializable.view(SchemaVersion1Dot5)
-    @serializable.view(SchemaVersion1Dot6)
-    @serializable.view(SchemaVersion1Dot7)
-    @serializable.xml_sequence(2)
-    @serializable.json_name('collection')
-    @serializable.xml_array(serializable.XmlArraySerializationType.NESTED, 'graphic')
-    @serializable.xml_name('collection')
-    def collection(self) -> 'SortedSet[Graphic]':
-        return self._collection
-
-    @collection.setter
-    def collection(self, collection: Iterable[Graphic]) -> None:
-        self._collection = SortedSet(collection)
-
-    def __comparable_tuple(self) -> _ComparableTuple:
-        return _ComparableTuple((self.description, _ComparableTuple(self.collection)))
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, GraphicsCollection):
-            return self.__comparable_tuple() == other.__comparable_tuple()
-        return False
-
-    def __lt__(self, other: Any) -> bool:
-        if isinstance(other, GraphicsCollection):
-            return self.__comparable_tuple() < other.__comparable_tuple()
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        return hash(self.__comparable_tuple())
-
-    def __repr__(self) -> str:
-        return f'<GraphicsCollection count={len(self.collection)}>'
+# Graphic and GraphicsCollection moved to cyclonedx.model.graphics to avoid import cycles
 
 
 @serializable.serializable_class(ignore_unknown_during_deserialization=True)

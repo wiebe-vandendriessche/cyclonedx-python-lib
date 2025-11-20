@@ -23,10 +23,12 @@ from cyclonedx.model import AttachedText, Encoding, ExternalReference, ExternalR
 from cyclonedx.model.bom import Bom
 from cyclonedx.model.component import Component, ComponentType
 from cyclonedx.model.contact import OrganizationalEntity
+from cyclonedx.model.data import ComponentData, ComponentDataKind
 from cyclonedx.model.model_card import (
     Approach,
     Co2Measure,
     Considerations,
+    DatasetReference,
     EnergyActivity,
     EnergyConsumption,
     EnergyMeasure,
@@ -170,6 +172,128 @@ class TestModelCardOnComponent(TestCase):
         xml = XML_BY_SCHEMA_VERSION[SchemaVersion.V1_5](bom).output_as_string(indent=2)
         self.assertIn('<modelCard>', xml)
         self.assertNotIn('<environmentalConsiderations>', xml)
+
+    def test_model_card_datasets_ref_v15_json_xml(self) -> None:
+        """Datasets allow referencing a data component via bom-ref or BOM-Link."""
+        # Create a data component to reference
+        data_comp = Component(name='training-dataset', type=ComponentType.DATA, bom_ref='data-1')
+
+        mc = self._make_basic_model_card()
+        # Add dataset reference (local bom-ref)
+        mp = mc.model_parameters or ModelParameters()
+        mp.datasets = [DatasetReference(ref=data_comp.bom_ref)]
+        mc.model_parameters = mp
+
+        model = Component(name='m', type=ComponentType.MACHINE_LEARNING_MODEL, model_card=mc)
+        bom = Bom(components=[model, data_comp])
+
+        # JSON 1.5
+        json = JSON_BY_SCHEMA_VERSION[SchemaVersion.V1_5](bom).output_as_string(indent=2)
+        try:
+            err = JsonStrictValidator(SchemaVersion.V1_5).validate_str(json)
+        except MissingOptionalDependencyException:
+            warn('!!! skipped schema validation', category=UserWarning, stacklevel=0)
+        else:
+            self.assertIsNone(err, json)
+        self.assertIn('"datasets"', json)
+        self.assertIn('"ref": "data-1"', json)
+
+        # XML 1.5
+        xml = XML_BY_SCHEMA_VERSION[SchemaVersion.V1_5](bom).output_as_string(indent=2)
+        try:
+            errx = XmlValidator(SchemaVersion.V1_5).validate_str(xml)
+        except MissingOptionalDependencyException:
+            warn('!!! skipped schema validation', category=UserWarning, stacklevel=0)
+        else:
+            self.assertIsNone(errx, xml)
+        self.assertIn('<datasets>', xml)
+        self.assertIn('<ref>data-1</ref>', xml)
+
+    def test_model_card_datasets_inline_v15_json_xml(self) -> None:
+        """Datasets may be inlined using componentDataType (ComponentData)."""
+        inline = ComponentData(type=ComponentDataKind.DATASET, name='InlineTrain')
+
+        mc = self._make_basic_model_card()
+        mp = mc.model_parameters or ModelParameters()
+        mp.datasets = [inline]
+        mc.model_parameters = mp
+
+        model = Component(name='m2', type=ComponentType.MACHINE_LEARNING_MODEL, model_card=mc)
+        bom = Bom(components=[model])
+
+        # JSON 1.5
+        json = JSON_BY_SCHEMA_VERSION[SchemaVersion.V1_5](bom).output_as_string(indent=2)
+        try:
+            err = JsonStrictValidator(SchemaVersion.V1_5).validate_str(json)
+        except MissingOptionalDependencyException:
+            warn('!!! skipped schema validation', category=UserWarning, stacklevel=0)
+        else:
+            self.assertIsNone(err, json)
+        self.assertIn('"datasets"', json)
+        self.assertIn('"type": "dataset"', json)
+        self.assertIn('"name": "InlineTrain"', json)
+
+        # XML 1.5
+        xml = XML_BY_SCHEMA_VERSION[SchemaVersion.V1_5](bom).output_as_string(indent=2)
+        try:
+            errx = XmlValidator(SchemaVersion.V1_5).validate_str(xml)
+        except MissingOptionalDependencyException:
+            warn('!!! skipped schema validation', category=UserWarning, stacklevel=0)
+        else:
+            self.assertIsNone(errx, xml)
+        self.assertIn('<datasets>', xml)
+        self.assertIn('<dataset>', xml)
+        self.assertIn('<type>dataset</type>', xml)
+
+    def test_model_card_datasets_mixed_v15_json_xml(self) -> None:
+        """Datasets support inline, local bom-ref, and BOM-Link refs together."""
+        # Data component to reference via local bom-ref
+        data_comp = Component(name='training-dataset', type=ComponentType.DATA, bom_ref='data-2')
+
+        # Inline dataset
+        inline = ComponentData(type=ComponentDataKind.DATASET, name='InlineMix')
+        # Local reference (bom-ref)
+        ref_local = DatasetReference(ref=data_comp.bom_ref)
+        # BOM-Link style reference (XsUri urn:cdx:...)
+        ref_bom_link = DatasetReference(ref=XsUri('urn:cdx:mix:1'))
+
+        mc = self._make_basic_model_card()
+        mp = mc.model_parameters or ModelParameters()
+        mp.datasets = [inline, ref_local, ref_bom_link]
+        mc.model_parameters = mp
+
+        model = Component(name='m3', type=ComponentType.MACHINE_LEARNING_MODEL, model_card=mc)
+        bom = Bom(components=[model, data_comp])
+
+        # JSON 1.5
+        json = JSON_BY_SCHEMA_VERSION[SchemaVersion.V1_5](bom).output_as_string(indent=2)
+        try:
+            err = JsonStrictValidator(SchemaVersion.V1_5).validate_str(json)
+        except MissingOptionalDependencyException:
+            warn('!!! skipped schema validation', category=UserWarning, stacklevel=0)
+        else:
+            self.assertIsNone(err, json)
+        # contains datasets array with inline object and two refs
+        self.assertIn('"datasets"', json)
+        self.assertIn('"type": "dataset"', json)  # inline present
+        self.assertIn('"name": "InlineMix"', json)
+        self.assertIn('"ref": "data-2"', json)  # local bom-ref
+        self.assertIn('"ref": "urn:cdx:mix:1"', json)  # BOM-Link
+
+        # XML 1.5
+        xml = XML_BY_SCHEMA_VERSION[SchemaVersion.V1_5](bom).output_as_string(indent=2)
+        try:
+            errx = XmlValidator(SchemaVersion.V1_5).validate_str(xml)
+        except MissingOptionalDependencyException:
+            warn('!!! skipped schema validation', category=UserWarning, stacklevel=0)
+        else:
+            self.assertIsNone(errx, xml)
+        # contains datasets with <dataset> and <ref> entries (both kinds)
+        self.assertIn('<datasets>', xml)
+        self.assertIn('<dataset>', xml)  # inline present
+        self.assertIn('<name>InlineMix</name>', xml)
+        self.assertIn('<ref>data-2</ref>', xml)
+        self.assertIn('<ref>urn:cdx:mix:1</ref>', xml)
 
     def test_model_card_full_v17_json_xml(self) -> None:
         """Test full-featured ModelCard serialization in BOM 1.7 JSON and XML formats."""

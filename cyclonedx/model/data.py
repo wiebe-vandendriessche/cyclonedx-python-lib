@@ -35,7 +35,7 @@ Notes
 
 from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import py_serializable as serializable
 from sortedcontainers import SortedSet
@@ -45,7 +45,7 @@ from ..model import AttachedText, Property, XsUri
 from ..model.bom_ref import BomRef
 from ..model.contact import OrganizationalContact, OrganizationalEntity
 from ..schema.schema import SchemaVersion1Dot5, SchemaVersion1Dot6, SchemaVersion1Dot7
-from .model_card import Graphic, GraphicsCollection
+from .graphics import GraphicsCollection
 
 
 @serializable.serializable_enum
@@ -186,7 +186,11 @@ class DataGovernanceResponsibleParty:
         return hash(self.__comparable_tuple())
 
     def __repr__(self) -> str:
-        return f'<DataGovernanceResponsibleParty org={self.organization is not None} contact={self.contact is not None}>'
+        return (
+            '<DataGovernanceResponsibleParty '
+            f'org={self.organization is not None} '
+            f'contact={self.contact is not None}>'
+        )
 
 
 @serializable.serializable_class(ignore_unknown_during_deserialization=True)
@@ -246,7 +250,11 @@ class DataGovernance:
         self._owners = SortedSet(owners)
 
     def __comparable_tuple(self) -> _ComparableTuple:
-        return _ComparableTuple((_ComparableTuple(self.custodians), _ComparableTuple(self.stewards), _ComparableTuple(self.owners)))
+        return _ComparableTuple((
+            _ComparableTuple(self.custodians),
+            _ComparableTuple(self.stewards),
+            _ComparableTuple(self.owners),
+        ))
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, DataGovernance):
@@ -262,7 +270,12 @@ class DataGovernance:
         return hash(self.__comparable_tuple())
 
     def __repr__(self) -> str:
-        return f'<DataGovernance custodians={len(self.custodians)} stewards={len(self.stewards)} owners={len(self.owners)}>'
+        return (
+            '<DataGovernance '
+            f'custodians={len(self.custodians)} '
+            f'stewards={len(self.stewards)} '
+            f'owners={len(self.owners)}>'
+        )
 
 
 @serializable.serializable_class(ignore_unknown_during_deserialization=True)
@@ -279,7 +292,7 @@ class ComponentData:
             graphics: Optional[GraphicsCollection] = None,
             description: Optional[str] = None,
             governance: Optional[DataGovernance] = None,
-            bom_ref: Optional[BomRef | str] = None,
+            bom_ref: Optional[Union[BomRef, str]] = None,
     ) -> None:
         self.type = type
         self.name = name
@@ -404,7 +417,7 @@ class ComponentData:
         return _ComparableTuple((
             self.type, self.name, self.contents, self.classification,
             _ComparableTuple(self.sensitive_data), self.graphics, self.description, self.governance,
-            BomRef.serialize(self.bom_ref) if self.bom_ref else None  # type: ignore[attr-defined]
+            BomRef.serialize(self.bom_ref) if self.bom_ref else None
         ))
 
     def __eq__(self, other: object) -> bool:
