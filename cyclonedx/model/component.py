@@ -66,11 +66,11 @@ from .bom_ref import BomRef
 from .component_evidence import ComponentEvidence, _ComponentEvidenceSerializationHelper
 from .contact import OrganizationalContact, OrganizationalEntity
 from .crypto import CryptoProperties
+from .data import ComponentData
 from .dependency import Dependable
 from .issue import IssueType
 from .license import License, LicenseRepository, _LicenseRepositorySerializationHelper
 from .model_card import ModelCard
-from .data import ComponentData
 from .release_note import ReleaseNotes
 
 

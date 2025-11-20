@@ -19,12 +19,14 @@ from unittest import TestCase
 
 from cyclonedx.model import ExternalReference, ExternalReferenceType, Property
 from cyclonedx.model.contact import OrganizationalEntity
+from cyclonedx.model.data import ComponentData, ComponentDataKind
 from cyclonedx.model.model_card import (
     Approach,
     Co2Measure,
     Co2MeasureUnit,
     ConfidenceInterval,
     Considerations,
+    DatasetReference,
     EnergyActivity,
     EnergyConsumption,
     EnergyMeasure,
