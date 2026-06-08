@@ -29,10 +29,6 @@ This set of classes represents the model card types in the CycloneDX standard.
 
 from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Optional, Union
-
-import py_serializable as serializable
-from sortedcontainers import SortedSet
 from json import loads as _json_loads
 from typing import TYPE_CHECKING, Any, Optional, Union
 from xml.etree.ElementTree import Element as _XmlElement  # nosec B405
@@ -44,14 +40,11 @@ from typing_extensions import TypeAlias
 from .._internal.bom_ref import bom_ref_from_str as _bom_ref_from_str
 from .._internal.compare import ComparableTuple as _ComparableTuple
 from ..schema.schema import SchemaVersion1Dot5, SchemaVersion1Dot6, SchemaVersion1Dot7
-from . import AttachedText, ExternalReference, Property
-from .bom_ref import BomRef
-from .contact import OrganizationalEntity
 from . import ExternalReference, Property, XsUri
 from .bom_ref import BomRef
 from .contact import OrganizationalEntity
 from .data import ComponentData
-from .graphics import GraphicsCollection
+from .graphics import Graphic, GraphicsCollection  # noqa: F401
 
 
 @serializable.serializable_enum
@@ -157,6 +150,8 @@ class InputOutputMLParameters:
     def __ge__(self, other: Any) -> bool:
         if isinstance(other, InputOutputMLParameters):
             return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -205,11 +200,19 @@ class DatasetReference:
             return False
         return NotImplemented
 
-    def __hash__(self) -> int:
-        return hash(self.__comparable_tuple())
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, DatasetReference):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        if isinstance(other, ComponentData):
+            return False
+        return NotImplemented
 
-    def __repr__(self) -> str:
-        return f'<DatasetReference ref={self.ref!r}>'
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, DatasetReference):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        if isinstance(other, ComponentData):
+            return True
+        return NotImplemented
 
     def __gt__(self, other: Any) -> bool:
         if isinstance(other, DatasetReference):
@@ -218,6 +221,12 @@ class DatasetReference:
             # Reference sorts after inline dataset
             return True
         return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.__comparable_tuple())
+
+    def __repr__(self) -> str:
+        return f'<DatasetReference ref={self.ref!r}>'
 
 
 # Mirror license.py approach: provide a Union alias and a repository wrapper
@@ -668,135 +677,6 @@ class PerformanceMetric:
 
     def __repr__(self) -> str:
         return f'<PerformanceMetric type={self.type!r} value={self.value!r}>'
-
-
-@serializable.serializable_class(ignore_unknown_during_deserialization=True)
-class Graphic:
-    """Graphic entry with optional name and image (AttachedText)."""
-
-    def __init__(self, *, name: Optional[str] = None, image: Optional[AttachedText] = None) -> None:
-        self.name = name
-        self.image = image
-
-    @property
-    @serializable.view(SchemaVersion1Dot5)
-    @serializable.view(SchemaVersion1Dot6)
-    @serializable.view(SchemaVersion1Dot7)
-    @serializable.xml_sequence(1)
-    @serializable.xml_string(serializable.XmlStringSerializationType.NORMALIZED_STRING)
-    def name(self) -> Optional[str]:
-        return self._name
-
-    @name.setter
-    def name(self, name: Optional[str]) -> None:
-        self._name = name
-
-    @property
-    @serializable.view(SchemaVersion1Dot5)
-    @serializable.view(SchemaVersion1Dot6)
-    @serializable.view(SchemaVersion1Dot7)
-    @serializable.xml_sequence(2)
-    def image(self) -> Optional[AttachedText]:
-        return self._image
-
-    @image.setter
-    def image(self, image: Optional[AttachedText]) -> None:
-        self._image = image
-
-    def __comparable_tuple(self) -> _ComparableTuple:
-        return _ComparableTuple((self.name, self.image))
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, Graphic):
-            return self.__comparable_tuple() == other.__comparable_tuple()
-        return False
-
-    def __lt__(self, other: Any) -> bool:
-        if isinstance(other, Graphic):
-            return self.__comparable_tuple() < other.__comparable_tuple()
-        return NotImplemented
-
-    def __le__(self, other: Any) -> bool:
-        if isinstance(other, Graphic):
-            return self.__comparable_tuple() <= other.__comparable_tuple()
-        return NotImplemented
-
-    def __ge__(self, other: Any) -> bool:
-        if isinstance(other, Graphic):
-            return self.__comparable_tuple() >= other.__comparable_tuple()
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        return hash(self.__comparable_tuple())
-
-    def __repr__(self) -> str:
-        return f'<Graphic name={self.name!r}>'
-
-
-@serializable.serializable_class(ignore_unknown_during_deserialization=True)
-class GraphicsCollection:
-    """A collection of graphics with optional description."""
-
-    def __init__(self, *, description: Optional[str] = None, collection: Optional[Iterable[Graphic]] = None) -> None:
-        self.description = description
-        self.collection = collection or []
-
-    @property
-    @serializable.view(SchemaVersion1Dot5)
-    @serializable.view(SchemaVersion1Dot6)
-    @serializable.view(SchemaVersion1Dot7)
-    @serializable.xml_sequence(1)
-    @serializable.xml_string(serializable.XmlStringSerializationType.NORMALIZED_STRING)
-    def description(self) -> Optional[str]:
-        return self._description
-
-    @description.setter
-    def description(self, description: Optional[str]) -> None:
-        self._description = description
-
-    @property
-    @serializable.view(SchemaVersion1Dot5)
-    @serializable.view(SchemaVersion1Dot6)
-    @serializable.view(SchemaVersion1Dot7)
-    @serializable.xml_sequence(2)
-    @serializable.json_name('collection')
-    @serializable.xml_array(serializable.XmlArraySerializationType.NESTED, 'graphic')
-    @serializable.xml_name('collection')
-    def collection(self) -> 'SortedSet[Graphic]':
-        return self._collection
-
-    @collection.setter
-    def collection(self, collection: Iterable[Graphic]) -> None:
-        self._collection = SortedSet(collection)
-
-    def __comparable_tuple(self) -> _ComparableTuple:
-        return _ComparableTuple((self.description, _ComparableTuple(self.collection)))
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, GraphicsCollection):
-            return self.__comparable_tuple() == other.__comparable_tuple()
-        return False
-
-    def __lt__(self, other: Any) -> bool:
-        if isinstance(other, GraphicsCollection):
-            return self.__comparable_tuple() < other.__comparable_tuple()
-        return NotImplemented
-
-    def __le__(self, other: Any) -> bool:
-        if isinstance(other, GraphicsCollection):
-            return self.__comparable_tuple() <= other.__comparable_tuple()
-        return NotImplemented
-
-    def __ge__(self, other: Any) -> bool:
-        if isinstance(other, GraphicsCollection):
-            return self.__comparable_tuple() >= other.__comparable_tuple()
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        return hash(self.__comparable_tuple())
-
-    def __repr__(self) -> str:
-        return f'<GraphicsCollection count={len(self.collection)}>'
 
 
 @serializable.serializable_class(ignore_unknown_during_deserialization=True)
