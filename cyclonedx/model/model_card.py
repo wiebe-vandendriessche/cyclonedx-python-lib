@@ -29,6 +29,10 @@ This set of classes represents the model card types in the CycloneDX standard.
 
 from collections.abc import Iterable
 from enum import Enum
+from typing import Any, Optional, Union
+
+import py_serializable as serializable
+from sortedcontainers import SortedSet
 from json import loads as _json_loads
 from typing import TYPE_CHECKING, Any, Optional, Union
 from xml.etree.ElementTree import Element as _XmlElement  # nosec B405
@@ -40,6 +44,9 @@ from typing_extensions import TypeAlias
 from .._internal.bom_ref import bom_ref_from_str as _bom_ref_from_str
 from .._internal.compare import ComparableTuple as _ComparableTuple
 from ..schema.schema import SchemaVersion1Dot5, SchemaVersion1Dot6, SchemaVersion1Dot7
+from . import AttachedText, ExternalReference, Property
+from .bom_ref import BomRef
+from .contact import OrganizationalEntity
 from . import ExternalReference, Property, XsUri
 from .bom_ref import BomRef
 from .contact import OrganizationalEntity
@@ -92,6 +99,16 @@ class Approach:
             return self.__comparable_tuple() < other.__comparable_tuple()
         return NotImplemented
 
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, Approach):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, Approach):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -132,6 +149,14 @@ class InputOutputMLParameters:
             return self.__comparable_tuple() < other.__comparable_tuple()
         return NotImplemented
 
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, InputOutputMLParameters):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, InputOutputMLParameters):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -459,6 +484,16 @@ class ModelParameters:
             return self.__comparable_tuple() < other.__comparable_tuple()
         return NotImplemented
 
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, ModelParameters):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, ModelParameters):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -517,6 +552,16 @@ class ConfidenceInterval:
             return self.__comparable_tuple() < other.__comparable_tuple()
         return NotImplemented
 
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, ConfidenceInterval):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, ConfidenceInterval):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -532,12 +577,12 @@ class PerformanceMetric:
         self, *,
         type: Optional[str] = None,
         value: Optional[str] = None,
-        slice: Optional[str] = None,
+        slice_: Optional[str] = None,
         confidence_interval: Optional[ConfidenceInterval] = None,
     ) -> None:
         self.type = type
         self.value = value
-        self.slice = slice
+        self.slice_ = slice_
         self.confidence_interval = confidence_interval
 
     @property
@@ -574,12 +619,12 @@ class PerformanceMetric:
     @serializable.json_name('slice')
     @serializable.xml_string(serializable.XmlStringSerializationType.NORMALIZED_STRING)
     @serializable.xml_name('slice')
-    def slice(self) -> Optional[str]:
+    def slice_(self) -> Optional[str]:
         return self._slice
 
-    @slice.setter
-    def slice(self, slice: Optional[str]) -> None:
-        self._slice = slice
+    @slice_.setter
+    def slice_(self, slice_: Optional[str]) -> None:
+        self._slice = slice_
 
     @property
     @serializable.view(SchemaVersion1Dot5)
@@ -596,7 +641,7 @@ class PerformanceMetric:
         self._confidence_interval = confidence_interval
 
     def __comparable_tuple(self) -> _ComparableTuple:
-        return _ComparableTuple((self.type, self.value, self.slice, self.confidence_interval))
+        return _ComparableTuple((self.type, self.value, self.slice_, self.confidence_interval))
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, PerformanceMetric):
@@ -608,6 +653,16 @@ class PerformanceMetric:
             return self.__comparable_tuple() < other.__comparable_tuple()
         return NotImplemented
 
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, PerformanceMetric):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, PerformanceMetric):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -615,7 +670,133 @@ class PerformanceMetric:
         return f'<PerformanceMetric type={self.type!r} value={self.value!r}>'
 
 
-# Graphic and GraphicsCollection moved to cyclonedx.model.graphics to avoid import cycles
+@serializable.serializable_class(ignore_unknown_during_deserialization=True)
+class Graphic:
+    """Graphic entry with optional name and image (AttachedText)."""
+
+    def __init__(self, *, name: Optional[str] = None, image: Optional[AttachedText] = None) -> None:
+        self.name = name
+        self.image = image
+
+    @property
+    @serializable.view(SchemaVersion1Dot5)
+    @serializable.view(SchemaVersion1Dot6)
+    @serializable.view(SchemaVersion1Dot7)
+    @serializable.xml_sequence(1)
+    @serializable.xml_string(serializable.XmlStringSerializationType.NORMALIZED_STRING)
+    def name(self) -> Optional[str]:
+        return self._name
+
+    @name.setter
+    def name(self, name: Optional[str]) -> None:
+        self._name = name
+
+    @property
+    @serializable.view(SchemaVersion1Dot5)
+    @serializable.view(SchemaVersion1Dot6)
+    @serializable.view(SchemaVersion1Dot7)
+    @serializable.xml_sequence(2)
+    def image(self) -> Optional[AttachedText]:
+        return self._image
+
+    @image.setter
+    def image(self, image: Optional[AttachedText]) -> None:
+        self._image = image
+
+    def __comparable_tuple(self) -> _ComparableTuple:
+        return _ComparableTuple((self.name, self.image))
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Graphic):
+            return self.__comparable_tuple() == other.__comparable_tuple()
+        return False
+
+    def __lt__(self, other: Any) -> bool:
+        if isinstance(other, Graphic):
+            return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, Graphic):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, Graphic):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.__comparable_tuple())
+
+    def __repr__(self) -> str:
+        return f'<Graphic name={self.name!r}>'
+
+
+@serializable.serializable_class(ignore_unknown_during_deserialization=True)
+class GraphicsCollection:
+    """A collection of graphics with optional description."""
+
+    def __init__(self, *, description: Optional[str] = None, collection: Optional[Iterable[Graphic]] = None) -> None:
+        self.description = description
+        self.collection = collection or []
+
+    @property
+    @serializable.view(SchemaVersion1Dot5)
+    @serializable.view(SchemaVersion1Dot6)
+    @serializable.view(SchemaVersion1Dot7)
+    @serializable.xml_sequence(1)
+    @serializable.xml_string(serializable.XmlStringSerializationType.NORMALIZED_STRING)
+    def description(self) -> Optional[str]:
+        return self._description
+
+    @description.setter
+    def description(self, description: Optional[str]) -> None:
+        self._description = description
+
+    @property
+    @serializable.view(SchemaVersion1Dot5)
+    @serializable.view(SchemaVersion1Dot6)
+    @serializable.view(SchemaVersion1Dot7)
+    @serializable.xml_sequence(2)
+    @serializable.json_name('collection')
+    @serializable.xml_array(serializable.XmlArraySerializationType.NESTED, 'graphic')
+    @serializable.xml_name('collection')
+    def collection(self) -> 'SortedSet[Graphic]':
+        return self._collection
+
+    @collection.setter
+    def collection(self, collection: Iterable[Graphic]) -> None:
+        self._collection = SortedSet(collection)
+
+    def __comparable_tuple(self) -> _ComparableTuple:
+        return _ComparableTuple((self.description, _ComparableTuple(self.collection)))
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, GraphicsCollection):
+            return self.__comparable_tuple() == other.__comparable_tuple()
+        return False
+
+    def __lt__(self, other: Any) -> bool:
+        if isinstance(other, GraphicsCollection):
+            return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, GraphicsCollection):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, GraphicsCollection):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.__comparable_tuple())
+
+    def __repr__(self) -> str:
+        return f'<GraphicsCollection count={len(self.collection)}>'
 
 
 @serializable.serializable_class(ignore_unknown_during_deserialization=True)
@@ -668,6 +849,16 @@ class QuantitativeAnalysis:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, QuantitativeAnalysis):
             return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, QuantitativeAnalysis):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, QuantitativeAnalysis):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -726,6 +917,16 @@ class EthicalConsideration:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, EthicalConsideration):
             return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, EthicalConsideration):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, EthicalConsideration):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -820,6 +1021,16 @@ class FairnessAssessment:
             return self.__comparable_tuple() < other.__comparable_tuple()
         return NotImplemented
 
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, FairnessAssessment):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, FairnessAssessment):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -884,6 +1095,16 @@ class EnvironmentalConsiderations:
             return self.__comparable_tuple() < other.__comparable_tuple()
         return NotImplemented
 
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, EnvironmentalConsiderations):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, EnvironmentalConsiderations):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -934,7 +1155,6 @@ class EnergyMeasure:
 
     @unit.setter
     def unit(self, unit: str) -> None:
-        # Spec allows only "kWh"
         self._unit = unit
 
     def __comparable_tuple(self) -> _ComparableTuple:
@@ -948,6 +1168,16 @@ class EnergyMeasure:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, EnergyMeasure):
             return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, EnergyMeasure):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, EnergyMeasure):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -986,7 +1216,6 @@ class Co2Measure:
 
     @unit.setter
     def unit(self, unit: str) -> None:
-        # Spec allows only "tCO2eq"
         self._unit = unit
 
     def __comparable_tuple(self) -> _ComparableTuple:
@@ -1000,6 +1229,16 @@ class Co2Measure:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, Co2Measure):
             return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, Co2Measure):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, Co2Measure):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -1108,6 +1347,7 @@ class EnergyProvider:
     @serializable.view(SchemaVersion1Dot6)
     @serializable.view(SchemaVersion1Dot7)
     @serializable.xml_sequence(5)
+    @serializable.json_name('externalReferences')
     @serializable.xml_name('externalReferences')
     @serializable.xml_array(serializable.XmlArraySerializationType.NESTED, 'reference')
     def external_references(self) -> 'SortedSet[ExternalReference]':
@@ -1135,6 +1375,16 @@ class EnergyProvider:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, EnergyProvider):
             return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, EnergyProvider):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, EnergyProvider):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -1258,6 +1508,16 @@ class EnergyConsumption:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, EnergyConsumption):
             return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, EnergyConsumption):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, EnergyConsumption):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -1416,6 +1676,16 @@ class Considerations:
             return self.__comparable_tuple() < other.__comparable_tuple()
         return NotImplemented
 
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, Considerations):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, Considerations):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -1509,6 +1779,9 @@ class ModelCard:
     @serializable.view(SchemaVersion1Dot6)
     @serializable.view(SchemaVersion1Dot7)
     @serializable.xml_sequence(4)
+    @serializable.json_name('properties')
+    @serializable.xml_name('properties')
+    @serializable.xml_array(serializable.XmlArraySerializationType.NESTED, 'property')
     def properties(self) -> 'SortedSet[Property]':
         return self._properties
 
@@ -1533,6 +1806,16 @@ class ModelCard:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, ModelCard):
             return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, ModelCard):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, ModelCard):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
