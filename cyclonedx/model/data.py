@@ -124,6 +124,16 @@ class DataContents:
             return self.__comparable_tuple() < other.__comparable_tuple()
         return NotImplemented
 
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, DataContents):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, DataContents):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -180,6 +190,16 @@ class DataGovernanceResponsibleParty:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, DataGovernanceResponsibleParty):
             return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, DataGovernanceResponsibleParty):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, DataGovernanceResponsibleParty):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -264,6 +284,16 @@ class DataGovernance:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, DataGovernance):
             return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, DataGovernance):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, DataGovernance):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -428,6 +458,16 @@ class ComponentData:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, ComponentData):
             return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, ComponentData):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, ComponentData):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
