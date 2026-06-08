@@ -72,6 +72,16 @@ class Graphic:
             return self.__comparable_tuple() < other.__comparable_tuple()
         return NotImplemented
 
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, Graphic):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, Graphic):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -126,6 +136,16 @@ class GraphicsCollection:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, GraphicsCollection):
             return self.__comparable_tuple() < other.__comparable_tuple()
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, GraphicsCollection):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, GraphicsCollection):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
