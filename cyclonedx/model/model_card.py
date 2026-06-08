@@ -44,7 +44,7 @@ from . import ExternalReference, Property, XsUri
 from .bom_ref import BomRef
 from .contact import OrganizationalEntity
 from .data import ComponentData
-from .graphics import GraphicsCollection
+from .graphics import Graphic, GraphicsCollection  # noqa: F401
 
 
 @serializable.serializable_enum
@@ -212,11 +212,19 @@ class DatasetReference:
             return False
         return NotImplemented
 
-    def __hash__(self) -> int:
-        return hash(self.__comparable_tuple())
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, DatasetReference):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        if isinstance(other, ComponentData):
+            return False
+        return NotImplemented
 
-    def __repr__(self) -> str:
-        return f'<DatasetReference ref={self.ref!r}>'
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, DatasetReference):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        if isinstance(other, ComponentData):
+            return True
+        return NotImplemented
 
     def __gt__(self, other: Any) -> bool:
         if isinstance(other, DatasetReference):
@@ -225,6 +233,12 @@ class DatasetReference:
             # Reference sorts after inline dataset
             return True
         return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.__comparable_tuple())
+
+    def __repr__(self) -> str:
+        return f'<DatasetReference ref={self.ref!r}>'
 
 
 # Mirror license.py approach: provide a Union alias and a repository wrapper
