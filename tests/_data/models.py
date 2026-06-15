@@ -88,6 +88,13 @@ from cyclonedx.model.crypto import (
     RelatedCryptoMaterialState,
     RelatedCryptoMaterialType,
 )
+from cyclonedx.model.data import (
+    ComponentData,
+    ComponentDataKind,
+    DataContents,
+    DataGovernance,
+    DataGovernanceResponsibleParty,
+)
 from cyclonedx.model.definition import CreId, Definitions, Level, Requirement, Standard
 from cyclonedx.model.dependency import Dependency
 from cyclonedx.model.impact_analysis import (
@@ -539,6 +546,79 @@ def get_bom_v1_5_with_full_model_card() -> Bom:
         bom_ref='ml-card-full',
         purl=PackageURL(type='pypi', name='full-model-card', version='1.0.0'),
         model_card=model_card,
+    )
+
+    bom = _make_bom(components=[component])
+    bom.register_dependency(component)
+    return bom
+
+
+def get_bom_v1_5_with_data_component() -> Bom:
+    """Single component with a fully populated componentData entry (schema 1.5+ only)."""
+
+    image_content = base64.b64encode(b'full-data-component-image').decode('utf-8')
+
+    governance = DataGovernance(
+        custodians=[
+            DataGovernanceResponsibleParty(organization=get_org_entity_1()),
+            DataGovernanceResponsibleParty(contact=get_org_contact_1()),
+        ],
+        stewards=[
+            DataGovernanceResponsibleParty(organization=get_org_entity_1()),
+        ],
+        owners=[
+            DataGovernanceResponsibleParty(contact=get_org_contact_1()),
+            DataGovernanceResponsibleParty(contact=get_org_contact_2()),
+        ],
+    )
+
+    data_component = ComponentData(
+        bom_ref='data-comp-full',
+        type=ComponentDataKind.DATASET,
+        name='training-dataset-v1',
+        contents=DataContents(
+            attachment=AttachedText(
+                content='aGVsbG8gd29ybGQ=',
+                content_type='text/plain',
+                encoding=Encoding.BASE_64,
+            ),
+            url=XsUri('https://example.com/datasets/training-v1.csv'),
+            properties=[Property(name='format', value='csv')],
+        ),
+        classification='public',
+        sensitive_data=['PII', 'financial'],
+        graphics=GraphicsCollection(
+            description='Data distribution plots',
+            collection=[
+                Graphic(
+                    name='class-distribution',
+                    image=AttachedText(
+                        content=image_content,
+                        content_type='image/png',
+                        encoding=Encoding.BASE_64,
+                    ),
+                ),
+                Graphic(
+                    name='feature-correlation',
+                    image=AttachedText(
+                        content=image_content,
+                        content_type='image/png',
+                        encoding=Encoding.BASE_64,
+                    ),
+                ),
+            ],
+        ),
+        description='Training dataset for the primary classifier, version 1.',
+        governance=governance,
+    )
+
+    component = Component(
+        name='full-data-component',
+        version='1.0.0',
+        type=ComponentType.DATA,
+        bom_ref='data-full',
+        purl=PackageURL(type='pypi', name='full-data-component', version='1.0.0'),
+        data=[data_component],
     )
 
     bom = _make_bom(components=[component])

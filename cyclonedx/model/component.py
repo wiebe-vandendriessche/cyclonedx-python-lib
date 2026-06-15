@@ -66,6 +66,7 @@ from .bom_ref import BomRef
 from .component_evidence import ComponentEvidence, _ComponentEvidenceSerializationHelper
 from .contact import OrganizationalContact, OrganizationalEntity
 from .crypto import CryptoProperties
+from .data import ComponentData
 from .dependency import Dependable
 from .issue import IssueType
 from .license import License, LicenseRepository, _LicenseRepositorySerializationHelper
@@ -1013,6 +1014,7 @@ class Component(Dependable):
         omnibor_ids: Optional[Iterable[OmniborId]] = None,
         swhids: Optional[Iterable[Swhid]] = None,
         crypto_properties: Optional[CryptoProperties] = None,
+        data: Optional[Iterable[ComponentData]] = None,
         tags: Optional[Iterable[str]] = None,
         # Deprecated in v1.6
         author: Optional[str] = None,
@@ -1044,6 +1046,7 @@ class Component(Dependable):
         self.release_notes = release_notes
         self.model_card = model_card
         self.crypto_properties = crypto_properties
+        self.data = data or []
         self.tags = tags or []
         # spec-deprecated properties below
         self.author = author
@@ -1631,16 +1634,24 @@ class Component(Dependable):
     # def model_card(self, ...) -> None:
     #     ...  # TODO since CDX1.5
 
-    # @property
-    # ...
-    # @serializable.view(SchemaVersion1Dot5)
-    # @serializable.xml_sequence(23)
-    # def data(self) -> ...:
-    #     ...  # TODO since CDX1.5
-    #
-    # @data.setter
-    # def data(self, ...) -> None:
-    #     ...  # TODO since CDX1.5
+    @property
+    @serializable.view(SchemaVersion1Dot5)
+    @serializable.view(SchemaVersion1Dot6)
+    @serializable.view(SchemaVersion1Dot7)
+    @serializable.xml_array(serializable.XmlArraySerializationType.FLAT, 'data')
+    @serializable.xml_sequence(27)
+    def data(self) -> 'SortedSet[ComponentData]':
+        """
+        Specifies data objects for components of type `data`.
+
+        Returns:
+            `Iterable[ComponentData]`
+        """
+        return self._data
+
+    @data.setter
+    def data(self, data: Iterable[ComponentData]) -> None:
+        self._data = SortedSet(data)
 
     @property
     @serializable.view(SchemaVersion1Dot6)
@@ -1712,7 +1723,7 @@ class Component(Dependable):
             _ComparableTuple(self.external_references), _ComparableTuple(self.properties),
             _ComparableTuple(self.components), self.evidence, self.release_notes, self.modified,
             _ComparableTuple(self.authors), _ComparableTuple(self.omnibor_ids), self.manufacturer,
-            self.crypto_properties, _ComparableTuple(self.tags), self.model_card,
+            self.crypto_properties, _ComparableTuple(self.tags), self.model_card, _ComparableTuple(self.data)
         ))
 
     def __eq__(self, other: object) -> bool:
