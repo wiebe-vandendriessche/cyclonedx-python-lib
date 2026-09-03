@@ -240,6 +240,16 @@ class JsfPublicKey:
             return self.__comparable_tuple() < other.__comparable_tuple()
         return NotImplemented
 
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, JsfPublicKey):
+            return self.__comparable_tuple() <= other.__comparable_tuple()
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, JsfPublicKey):
+            return self.__comparable_tuple() >= other.__comparable_tuple()
+        return NotImplemented
+
     def __hash__(self) -> int:
         return hash(self.__comparable_tuple())
 
@@ -286,6 +296,16 @@ class JsfSignature(ABC):
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, JsfSignature):
             return _JsfSignatureSerializationHelper._sort_key(self) < _JsfSignatureSerializationHelper._sort_key(other)
+        return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, JsfSignature):
+            return _JsfSignatureSerializationHelper._sort_key(self) <= _JsfSignatureSerializationHelper._sort_key(other)
+        return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, JsfSignature):
+            return _JsfSignatureSerializationHelper._sort_key(self) >= _JsfSignatureSerializationHelper._sort_key(other)
         return NotImplemented
 
     def __hash__(self) -> int:

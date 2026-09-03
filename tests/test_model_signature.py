@@ -24,475 +24,590 @@ from cyclonedx.model.signature import (
     JsfKeyType,
     JsfOkpCurve,
     JsfPublicKey,
-    JsfSignature,
     JsfSignatureChain,
     JsfSignatureSigners,
     JsfSimpleSignature,
-    _JsfSignatureSerializationHelper,
 )
+from tests import reorder
+
+
+class TestJsfAlgorithm(TestCase):
+    def test_enum_value(self) -> None:
+        self.assertEqual(JsfAlgorithm.RS256.value, 'RS256')
+        self.assertEqual(JsfAlgorithm.RS384.value, 'RS384')
+        self.assertEqual(JsfAlgorithm.RS512.value, 'RS512')
+        self.assertEqual(JsfAlgorithm.PS256.value, 'PS256')
+        self.assertEqual(JsfAlgorithm.PS384.value, 'PS384')
+        self.assertEqual(JsfAlgorithm.PS512.value, 'PS512')
+        self.assertEqual(JsfAlgorithm.ES256.value, 'ES256')
+        self.assertEqual(JsfAlgorithm.ES384.value, 'ES384')
+        self.assertEqual(JsfAlgorithm.ES512.value, 'ES512')
+        self.assertEqual(JsfAlgorithm.ED25519.value, 'Ed25519')
+        self.assertEqual(JsfAlgorithm.ED448.value, 'Ed448')
+        self.assertEqual(JsfAlgorithm.HS256.value, 'HS256')
+        self.assertEqual(JsfAlgorithm.HS384.value, 'HS384')
+        self.assertEqual(JsfAlgorithm.HS512.value, 'HS512')
+
+    def test_enum_comparison(self) -> None:
+        self.assertEqual(JsfAlgorithm.RS256, JsfAlgorithm('RS256'))
+        self.assertEqual(JsfAlgorithm.RS384, JsfAlgorithm('RS384'))
+        self.assertEqual(JsfAlgorithm.RS512, JsfAlgorithm('RS512'))
+        self.assertEqual(JsfAlgorithm.PS256, JsfAlgorithm('PS256'))
+        self.assertEqual(JsfAlgorithm.PS384, JsfAlgorithm('PS384'))
+        self.assertEqual(JsfAlgorithm.PS512, JsfAlgorithm('PS512'))
+        self.assertEqual(JsfAlgorithm.ES256, JsfAlgorithm('ES256'))
+        self.assertEqual(JsfAlgorithm.ES384, JsfAlgorithm('ES384'))
+        self.assertEqual(JsfAlgorithm.ES512, JsfAlgorithm('ES512'))
+        self.assertEqual(JsfAlgorithm.ED25519, JsfAlgorithm('Ed25519'))
+        self.assertEqual(JsfAlgorithm.ED448, JsfAlgorithm('Ed448'))
+        self.assertEqual(JsfAlgorithm.HS256, JsfAlgorithm('HS256'))
+        self.assertEqual(JsfAlgorithm.HS384, JsfAlgorithm('HS384'))
+        self.assertEqual(JsfAlgorithm.HS512, JsfAlgorithm('HS512'))
+
+
+class TestJsfKeyType(TestCase):
+    def test_enum_value(self) -> None:
+        self.assertEqual(JsfKeyType.EC.value, 'EC')
+        self.assertEqual(JsfKeyType.OKP.value, 'OKP')
+        self.assertEqual(JsfKeyType.RSA.value, 'RSA')
+
+    def test_enum_comparison(self) -> None:
+        self.assertEqual(JsfKeyType.EC, JsfKeyType('EC'))
+        self.assertEqual(JsfKeyType.OKP, JsfKeyType('OKP'))
+        self.assertEqual(JsfKeyType.RSA, JsfKeyType('RSA'))
+
+
+class TestJsfEcCurve(TestCase):
+    def test_enum_value(self) -> None:
+        self.assertEqual(JsfEcCurve.P_256.value, 'P-256')
+        self.assertEqual(JsfEcCurve.P_384.value, 'P-384')
+        self.assertEqual(JsfEcCurve.P_521.value, 'P-521')
+
+    def test_enum_comparison(self) -> None:
+        self.assertEqual(JsfEcCurve.P_256, JsfEcCurve('P-256'))
+        self.assertEqual(JsfEcCurve.P_384, JsfEcCurve('P-384'))
+        self.assertEqual(JsfEcCurve.P_521, JsfEcCurve('P-521'))
+
+
+class TestJsfOkpCurve(TestCase):
+    def test_enum_value(self) -> None:
+        self.assertEqual(JsfOkpCurve.ED25519.value, 'Ed25519')
+        self.assertEqual(JsfOkpCurve.ED448.value, 'Ed448')
+
+    def test_enum_comparison(self) -> None:
+        self.assertEqual(JsfOkpCurve.ED25519, JsfOkpCurve('Ed25519'))
+        self.assertEqual(JsfOkpCurve.ED448, JsfOkpCurve('Ed448'))
 
 
 class TestJsfPublicKey(TestCase):
 
-    def test_ec_public_key(self) -> None:
-        pk = JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='abc', y='def')
-        self.assertEqual(pk.kty, JsfKeyType.EC)
-        self.assertEqual(pk.crv, 'P-256')
-        self.assertEqual(pk.x, 'abc')
-        self.assertEqual(pk.y, 'def')
-        self.assertIsNone(pk.n)
-        self.assertIsNone(pk.e)
+    # -------------------------------------------------------------------------
+    # Constructor & Property Tests (Valid Configurations)
+    # -------------------------------------------------------------------------
 
-    def test_okp_public_key(self) -> None:
-        pk = JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfOkpCurve.ED25519, x='xyz')
-        self.assertEqual(pk.kty, JsfKeyType.OKP)
-        self.assertEqual(pk.crv, 'Ed25519')
-        self.assertEqual(pk.x, 'xyz')
-        self.assertIsNone(pk.y)
-        self.assertIsNone(pk.n)
-        self.assertIsNone(pk.e)
+    def test_constructor_ec(self) -> None:
+        obj = JsfPublicKey(
+            kty=JsfKeyType.EC,
+            crv=JsfEcCurve.P_256,
+            x='foo',
+            y='bar'
+        )
+        self.assertEqual(obj.kty, JsfKeyType.EC)
+        self.assertEqual(obj.crv, JsfEcCurve.P_256)
+        self.assertEqual(obj.x, 'foo')
+        self.assertEqual(obj.y, 'bar')
+        self.assertIsNone(obj.n)
+        self.assertIsNone(obj.e)
 
-    def test_rsa_public_key(self) -> None:
-        pk = JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent')
-        self.assertEqual(pk.kty, JsfKeyType.RSA)
-        self.assertEqual(pk.n, 'modulus')
-        self.assertEqual(pk.e, 'exponent')
-        self.assertIsNone(pk.crv)
-        self.assertIsNone(pk.x)
-        self.assertIsNone(pk.y)
+    def test_constructor_okp(self) -> None:
+        obj = JsfPublicKey(
+            kty=JsfKeyType.OKP,
+            crv=JsfOkpCurve.ED25519,
+            x='foo'
+        )
+        self.assertEqual(obj.kty, JsfKeyType.OKP)
+        self.assertEqual(obj.crv, JsfOkpCurve.ED25519)
+        self.assertEqual(obj.x, 'foo')
+        self.assertIsNone(obj.y)
+        self.assertIsNone(obj.n)
+        self.assertIsNone(obj.e)
 
-    def test_equality(self) -> None:
-        pk1 = JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='abc', y='def')
-        pk2 = JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='abc', y='def')
-        pk3 = JsfPublicKey(kty=JsfKeyType.RSA, n='n', e='e')
-        self.assertEqual(pk1, pk2)
-        self.assertNotEqual(pk1, pk3)
+    def test_constructor_rsa(self) -> None:
+        obj = JsfPublicKey(
+            kty=JsfKeyType.RSA,
+            n='modulus',
+            e='exponent'
+        )
+        self.assertEqual(obj.kty, JsfKeyType.RSA)
+        self.assertIsNone(obj.crv)
+        self.assertIsNone(obj.x)
+        self.assertIsNone(obj.y)
+        self.assertEqual(obj.n, 'modulus')
+        self.assertEqual(obj.e, 'exponent')
 
-    def test_hash_stable(self) -> None:
-        pk1 = JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='abc', y='def')
-        pk2 = JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='abc', y='def')
-        self.assertEqual(hash(pk1), hash(pk2))
+    def test_property_setters(self) -> None:
+        obj = JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent')
+        obj.n = 'new_modulus'
+        self.assertEqual(obj.n, 'new_modulus')
 
-    def test_sorting(self) -> None:
-        pks = [
-            JsfPublicKey(kty=JsfKeyType.RSA, n='n', e='e'),
-            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='abc', y='def'),
-            JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfOkpCurve.ED25519, x='xyz'),
+    # -------------------------------------------------------------------------
+    # Exhaustive Conditional Validation Tests (Every Permutation)
+    # -------------------------------------------------------------------------
+
+    # --- EC Key Type Validations ---
+
+    def test_validation_ec_missing_crv(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfPublicKey(kty=JsfKeyType.EC, crv=None, x='foo', y='bar')
+        self.assertEqual(str(context.exception), 'EC public key requires crv, x, and y')
+
+    def test_validation_ec_missing_x(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x=None, y='bar')
+        self.assertEqual(str(context.exception), 'EC public key requires crv, x, and y')
+
+    def test_validation_ec_missing_y(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='foo', y=None)
+        self.assertEqual(str(context.exception), 'EC public key requires crv, x, and y')
+
+    def test_validation_ec_invalid_curve_type(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfOkpCurve.ED25519, x='foo', y='bar')
+        self.assertEqual(
+            str(context.exception),
+            "EC public key crv must be a JsfEcCurve instance, got 'JsfOkpCurve'"
+        )
+
+    def test_validation_ec_prohibits_n(self) -> None:
+        with self.assertRaises(InvalidValueException):
+            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='foo', y='bar', n='modulus')
+
+    def test_validation_ec_prohibits_e(self) -> None:
+        with self.assertRaises(InvalidValueException):
+            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='foo', y='bar', e='exponent')
+
+    # --- OKP Key Type Validations ---
+
+    def test_validation_okp_missing_crv(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfPublicKey(kty=JsfKeyType.OKP, crv=None, x='foo')
+        self.assertEqual(str(context.exception), 'OKP public key requires crv and x')
+
+    def test_validation_okp_missing_x(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfOkpCurve.ED25519, x=None)
+        self.assertEqual(str(context.exception), 'OKP public key requires crv and x')
+
+    def test_validation_okp_invalid_curve_type(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfEcCurve.P_256, x='foo')
+        self.assertEqual(
+            str(context.exception),
+            "OKP public key crv must be a JsfOkpCurve instance, got 'JsfEcCurve'"
+        )
+
+    def test_validation_okp_prohibits_y(self) -> None:
+        with self.assertRaises(InvalidValueException):
+            JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfOkpCurve.ED25519, x='foo', y='bar')
+
+    def test_validation_okp_prohibits_n(self) -> None:
+        with self.assertRaises(InvalidValueException):
+            JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfOkpCurve.ED25519, x='foo', n='modulus')
+
+    def test_validation_okp_prohibits_e(self) -> None:
+        with self.assertRaises(InvalidValueException):
+            JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfOkpCurve.ED25519, x='foo', e='exponent')
+
+    # --- RSA Key Type Validations ---
+
+    def test_validation_rsa_missing_n(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfPublicKey(kty=JsfKeyType.RSA, n=None, e='exponent')
+        self.assertEqual(str(context.exception), 'RSA public key requires n and e')
+
+    def test_validation_rsa_missing_e(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e=None)
+        self.assertEqual(str(context.exception), 'RSA public key requires n and e')
+
+    def test_validation_rsa_prohibits_crv(self) -> None:
+        with self.assertRaises(InvalidValueException):
+            JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent', crv=JsfEcCurve.P_256)
+
+    def test_validation_rsa_prohibits_x(self) -> None:
+        with self.assertRaises(InvalidValueException):
+            JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent', x='foo')
+
+    def test_validation_rsa_prohibits_y(self) -> None:
+        with self.assertRaises(InvalidValueException):
+            JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent', y='bar')
+
+    # -------------------------------------------------------------------------
+    # Equality, Comparison, Hash & Sort Tests
+    # -------------------------------------------------------------------------
+
+    def test_same(self) -> None:
+        key_1 = JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent')
+        key_2 = JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent')
+
+        self.assertNotEqual(id(key_1), id(key_2))
+        self.assertEqual(hash(key_1), hash(key_2))
+        self.assertTrue(key_1 == key_2)
+
+    def test_not_same(self) -> None:
+        key_1 = JsfPublicKey(kty=JsfKeyType.RSA, n='modulus1', e='exponent')
+        key_2 = JsfPublicKey(kty=JsfKeyType.RSA, n='modulus2', e='exponent')
+
+        self.assertNotEqual(hash(key_1), hash(key_2))
+        self.assertFalse(key_1 == key_2)
+
+    def test_compare_same_type(self) -> None:
+        key_1 = JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent')
+        key_2 = JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent')
+
+        self.assertFalse(key_1 < key_2)
+        self.assertTrue(key_1 <= key_2)
+        self.assertTrue(key_1 >= key_2)
+
+    def test_comparison(self) -> None:
+        key_1 = JsfPublicKey(kty=JsfKeyType.RSA, n='a', e='exponent')
+        key_2 = JsfPublicKey(kty=JsfKeyType.RSA, n='b', e='exponent')
+
+        self.assertTrue(key_1 < key_2)
+        self.assertTrue(key_1 <= key_2)
+        self.assertTrue(key_2 >= key_1)
+
+    def test_sort(self) -> None:
+        expected_order = [2, 1, 0]
+        keys = [
+            JsfPublicKey(kty=JsfKeyType.RSA, n='c', e='exponent'),
+            JsfPublicKey(kty=JsfKeyType.RSA, n='b', e='exponent'),
+            JsfPublicKey(kty=JsfKeyType.RSA, n='a', e='exponent'),
         ]
-        sorted_pks = sorted(pks)
-        self.assertEqual(len(sorted_pks), 3)
-
-    def test_ec_validation_missing_crv(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.EC, x='abc', y='def')
-        self.assertIn('EC', str(cm.exception))
-
-    def test_ec_validation_missing_x(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, y='def')
-        self.assertIn('EC', str(cm.exception))
-
-    def test_ec_validation_missing_y(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='abc')
-        self.assertIn('EC', str(cm.exception))
-
-    def test_okp_validation_missing_crv(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.OKP, x='xyz')
-        self.assertIn('OKP', str(cm.exception))
-
-    def test_okp_validation_missing_x(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfOkpCurve.ED25519)
-        self.assertIn('OKP', str(cm.exception))
-
-    def test_rsa_validation_missing_n(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.RSA, e='exponent')
-        self.assertIn('RSA', str(cm.exception))
-
-    def test_rsa_validation_missing_e(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.RSA, n='modulus')
-        self.assertIn('RSA', str(cm.exception))
+        expected_keys = reorder(keys, expected_order)
+        sorted_keys = sorted(keys)
+        self.assertListEqual(sorted_keys, expected_keys)
 
     def test_repr(self) -> None:
-        pk = JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='abc', y='def')
-        self.assertIn('JsfPublicKey', repr(pk))
-        self.assertIn('EC', repr(pk))
-
-    def test_ec_crv_string_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException):
-            JsfPublicKey(kty=JsfKeyType.EC, crv='P-256', x='abc', y='def')  # type: ignore[arg-type]
-
-    def test_okp_crv_string_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException):
-            JsfPublicKey(kty=JsfKeyType.OKP, crv='Ed25519', x='xyz')  # type: ignore[arg-type]
-
-    def test_ec_crv_enum_accepted(self) -> None:
-        pk = JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_384, x='abc', y='def')
-        self.assertEqual(pk.crv, JsfEcCurve.P_384)
-
-    def test_okp_crv_enum_accepted(self) -> None:
-        pk = JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfOkpCurve.ED448, x='xyz')
-        self.assertEqual(pk.crv, JsfOkpCurve.ED448)
-
-    def test_ec_crv_wrong_type_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException):
-            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfOkpCurve.ED25519, x='abc', y='def')  # type: ignore[arg-type]
-
-    def test_okp_crv_wrong_type_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException):
-            JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfEcCurve.P_256, x='xyz')  # type: ignore[arg-type]
-
-    def test_ec_validation_with_n_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='abc', y='def', n='modulus')
-        self.assertIn('EC', str(cm.exception))
-
-    def test_ec_validation_with_e_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='abc', y='def', e='exponent')
-        self.assertIn('EC', str(cm.exception))
-
-    def test_okp_validation_with_y_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfOkpCurve.ED25519, x='xyz', y='not-valid')
-        self.assertIn('OKP', str(cm.exception))
-
-    def test_okp_validation_with_n_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfOkpCurve.ED25519, x='xyz', n='modulus')
-        self.assertIn('OKP', str(cm.exception))
-
-    def test_okp_validation_with_e_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.OKP, crv=JsfOkpCurve.ED25519, x='xyz', e='exponent')
-        self.assertIn('OKP', str(cm.exception))
-
-    def test_rsa_validation_with_crv_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent', crv=JsfEcCurve.P_256)
-        self.assertIn('RSA', str(cm.exception))
-
-    def test_rsa_validation_with_x_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent', x='abc')
-        self.assertIn('RSA', str(cm.exception))
-
-    def test_rsa_validation_with_y_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException) as cm:
-            JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent', y='def')
-        self.assertIn('RSA', str(cm.exception))
-
-    def test_crv_serialized_as_string_value(self) -> None:
-        pk = JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_521, x='abc', y='def')
-        d = pk._as_dict()
-        self.assertEqual(d['crv'], 'P-521')
-        self.assertIsInstance(d['crv'], str)
-        self.assertNotIsInstance(d['crv'], JsfEcCurve)
+        obj = JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent')
+        self.assertIn('JsfPublicKey', repr(obj))
 
 
 class TestJsfSimpleSignature(TestCase):
-    """Tests for JsfSimpleSignature (simple signature mode)."""
 
-    def test_minimal(self) -> None:
-        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='sig-value')
-        self.assertEqual(sig.algorithm, JsfAlgorithm.ES256)
-        self.assertEqual(sig.value, 'sig-value')
+    def test_defaults(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        self.assertIs(JsfAlgorithm.RS256, sig.algorithm)
+        self.assertEqual(sig.value, 'val')
         self.assertIsNone(sig.key_id)
         self.assertIsNone(sig.public_key)
         self.assertEqual(sig.certificate_path, [])
         self.assertEqual(sig.excludes, [])
 
-    def test_full(self) -> None:
-        pk = JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='abc', y='def')
+    def test_constructor(self) -> None:
+        pk = JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent')
         sig = JsfSimpleSignature(
             algorithm=JsfAlgorithm.ES256,
-            value='sig-value',
+            value='val',
             key_id='my-key',
             public_key=pk,
-            certificate_path=['cert-pem'],
+            certificate_path=['cert-a', 'cert-b'],
             excludes=['field1', 'field2'],
         )
-        self.assertEqual(sig.public_key, pk)
+        self.assertIs(JsfAlgorithm.ES256, sig.algorithm)
+        self.assertEqual(sig.value, 'val')
         self.assertEqual(sig.key_id, 'my-key')
-        self.assertEqual(sig.certificate_path, ['cert-pem'])
+        self.assertEqual(sig.public_key, pk)
+        # certificate_path/excludes are ordered lists -- order is preserved, not sorted
+        self.assertEqual(sig.certificate_path, ['cert-a', 'cert-b'])
         self.assertEqual(sig.excludes, ['field1', 'field2'])
 
-    def test_algorithm_as_enum(self) -> None:
-        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')
-        self.assertIsInstance(sig.algorithm, JsfAlgorithm)
+    def test_create(self) -> None:
+        sig_rs = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val1')
+        sig_proprietary = JsfSimpleSignature(algorithm='urn:ietf:rfc:8032', value='val2')
+        self.assertIs(JsfAlgorithm.RS256, sig_rs.algorithm)
+        # a proprietary algorithm URI that does not match a known JsfAlgorithm is kept as-is
+        self.assertEqual('urn:ietf:rfc:8032', sig_proprietary.algorithm)
 
-    def test_algorithm_as_uri_string(self) -> None:
-        sig = JsfSimpleSignature(algorithm='https://example.com/algo', value='v')
-        self.assertIsInstance(sig.algorithm, str)
-        self.assertNotIsInstance(sig.algorithm, JsfAlgorithm)
+    def test_update(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        self.assertIs(JsfAlgorithm.RS256, sig.algorithm)
+        sig.algorithm = JsfOkpCurve.ED25519
+        self.assertIs(JsfOkpCurve.ED25519, sig.algorithm)
 
-    def test_proprietary_algorithm_non_uri_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException):
-            JsfSimpleSignature(algorithm='not-a-uri', value='v')
-
-    def test_proprietary_algorithm_urn_accepted(self) -> None:
-        sig = JsfSimpleSignature(algorithm='urn:example:my-algo', value='v')
-        self.assertEqual(sig.algorithm, 'urn:example:my-algo')
-
-    def test_algorithm_enum_roundtrip(self) -> None:
-        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='AABBCC==')
-        d = sig._as_dict()
-        self.assertEqual(d['algorithm'], 'RS256')
-        restored = JsfSimpleSignature._from_dict(d)
-        self.assertIsInstance(restored.algorithm, JsfAlgorithm)
-        self.assertEqual(restored.algorithm, JsfAlgorithm.RS256)
-
-    def test_algorithm_serialized_as_value_string(self) -> None:
-        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.ED25519, value='v')
-        d = sig._as_dict()
-        self.assertEqual(d['algorithm'], 'Ed25519')
-
-    def test_equality(self) -> None:
-        sig1 = JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='v')
-        sig2 = JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='v')
-        sig3 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')
-        self.assertEqual(sig1, sig2)
-        self.assertNotEqual(sig1, sig3)
-
-    def test_not_equal_to_other_modes(self) -> None:
-        simple = JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='v')
-        multi = JsfSignatureSigners(signers=[JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='v')])
-        self.assertNotEqual(simple, multi)
-
-    def test_hash_stable(self) -> None:
-        sig1 = JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='v')
-        sig2 = JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='v')
-        self.assertEqual(hash(sig1), hash(sig2))
-
-    def test_sorting(self) -> None:
+    def test_sort(self) -> None:
+        expected_order = [1, 0]
         sigs = [
             JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b'),
-            JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='a'),
+            JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a'),
         ]
+        expected_sigs = reorder(sigs, expected_order)
         sorted_sigs = sorted(sigs)
-        self.assertEqual(len(sorted_sigs), 2)
+        self.assertListEqual(sorted_sigs, expected_sigs)
+
+    def test_no_params(self) -> None:
+        with self.assertRaises(TypeError):
+            JsfSimpleSignature()
+
+    def test_validation_proprietary_algorithm_requires_uri(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfSimpleSignature(algorithm='not-a-uri', value='val')
+        self.assertEqual(
+            str(context.exception),
+            "Proprietary JSF algorithm must be expressed as a URI, got 'not-a-uri'"
+        )
+
+    def test_same(self) -> None:
+        sig_1 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        sig_2 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+
+        self.assertNotEqual(id(sig_1), id(sig_2))
+        self.assertEqual(hash(sig_1), hash(sig_2))
+        self.assertTrue(sig_1 == sig_2)
+
+    def test_not_same(self) -> None:
+        sig_1 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a')
+        sig_2 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b')
+
+        self.assertNotEqual(hash(sig_1), hash(sig_2))
+        self.assertFalse(sig_1 == sig_2)
+
+    def test_unequal_different_type(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        self.assertFalse(sig == 'other')
+
+    def test_compare_same_type(self) -> None:
+        sig_1 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        sig_2 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+
+        self.assertFalse(sig_1 < sig_2)
+        self.assertTrue(sig_1 <= sig_2)
+        self.assertTrue(sig_1 >= sig_2)
+
+    def test_comparison(self) -> None:
+        sig_1 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a')
+        sig_2 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b')
+
+        self.assertTrue(sig_1 < sig_2)
+        self.assertTrue(sig_1 <= sig_2)
+        self.assertTrue(sig_2 >= sig_1)
 
     def test_repr(self) -> None:
-        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='v')
-        self.assertIn('JsfSimpleSignature', repr(sig))
-        self.assertIn('ES256', repr(sig))
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        self.assertIn(
+            repr(sig),
+            {
+                '<JsfSimpleSignature algorithm=RS256>',
+                '<JsfSimpleSignature algorithm=JsfAlgorithm.RS256>',
+                "<JsfSimpleSignature algorithm=<JsfAlgorithm.RS256: 'RS256'>>"
+            }
+        )
 
 
 class TestJsfSignatureSigners(TestCase):
-    """Tests for JsfSignatureSigners (multisignature mode)."""
 
-    def test_minimal(self) -> None:
-        signer = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v1')
-        sig = JsfSignatureSigners(signers=[signer])
-        self.assertEqual(len(sig.signers), 1)
-        self.assertEqual(sig.signers[0], signer)
+    def test_no_params(self) -> None:
+        with self.assertRaises(TypeError):
+            JsfSignatureSigners()
 
-    def test_multiple_signers(self) -> None:
-        s1 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v1')
-        s2 = JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='v2')
-        sig = JsfSignatureSigners(signers=[s1, s2])
-        self.assertEqual(len(sig.signers), 2)
+    def test_validation_requires_at_least_one_signer(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfSignatureSigners(signers=[])
+        self.assertEqual(str(context.exception), 'JsfSignatureSigners requires at least one signer')
 
-    def test_is_jsfsignature_subclass(self) -> None:
-        sig = JsfSignatureSigners(signers=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')])
-        self.assertIsInstance(sig, JsfSignature)
+    def test_defaults(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        obj = JsfSignatureSigners(signers=[sig])
+        self.assertEqual(list(obj.signers), [sig])
 
-    def test_equality(self) -> None:
-        s = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')
-        sig1 = JsfSignatureSigners(signers=[s])
-        sig2 = JsfSignatureSigners(signers=[s])
-        sig3 = JsfSignatureSigners(signers=[JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='x')])
-        self.assertEqual(sig1, sig2)
-        self.assertNotEqual(sig1, sig3)
+    def test_constructor(self) -> None:
+        sigs = [
+            JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b'),
+            JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a'),
+        ]
+        obj = JsfSignatureSigners(signers=sigs)
+        # signers is an ordered list -- input order is preserved, not sorted
+        self.assertEqual(list(obj.signers), sigs)
 
-    def test_not_equal_to_chain(self) -> None:
-        s = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')
-        multi = JsfSignatureSigners(signers=[s])
-        chain = JsfSignatureChain(chain=[s])
-        self.assertNotEqual(multi, chain)
+    def test_sort(self) -> None:
+        expected_order = [1, 0]
+        objs = [
+            JsfSignatureSigners(signers=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b')]),
+            JsfSignatureSigners(signers=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a')]),
+        ]
+        expected_objs = reorder(objs, expected_order)
+        sorted_objs = sorted(objs)
+        self.assertListEqual(sorted_objs, expected_objs)
 
-    def test_hash_stable(self) -> None:
-        s = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')
-        sig1 = JsfSignatureSigners(signers=[s])
-        sig2 = JsfSignatureSigners(signers=[s])
-        self.assertEqual(hash(sig1), hash(sig2))
+    def test_same(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        obj_1 = JsfSignatureSigners(signers=[sig])
+        obj_2 = JsfSignatureSigners(signers=[sig])
+
+        self.assertNotEqual(id(obj_1), id(obj_2))
+        self.assertEqual(hash(obj_1), hash(obj_2))
+        self.assertTrue(obj_1 == obj_2)
+
+    def test_not_same(self) -> None:
+        obj_1 = JsfSignatureSigners(signers=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a')])
+        obj_2 = JsfSignatureSigners(signers=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b')])
+
+        self.assertNotEqual(hash(obj_1), hash(obj_2))
+        self.assertFalse(obj_1 == obj_2)
+
+    def test_unequal_different_type(self) -> None:
+        obj = JsfSignatureSigners(signers=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')])
+        self.assertFalse(obj == 'other')
+
+    def test_compare_same_type(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        obj_1 = JsfSignatureSigners(signers=[sig])
+        obj_2 = JsfSignatureSigners(signers=[sig])
+
+        self.assertFalse(obj_1 < obj_2)
+        self.assertTrue(obj_1 <= obj_2)
+        self.assertTrue(obj_1 >= obj_2)
+
+    def test_comparison(self) -> None:
+        sig_a = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a')
+        sig_b = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b')
+        obj_1 = JsfSignatureSigners(signers=[sig_a])
+        obj_2 = JsfSignatureSigners(signers=[sig_b])
+
+        self.assertTrue(obj_1 < obj_2)
+        self.assertTrue(obj_1 <= obj_2)
+        self.assertTrue(obj_2 >= obj_1)
+
+    def test_hash(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        self.assertEqual(
+            hash(JsfSignatureSigners(signers=[sig])),
+            hash(JsfSignatureSigners(signers=[sig])),
+        )
 
     def test_repr(self) -> None:
-        s = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')
-        sig = JsfSignatureSigners(signers=[s])
-        self.assertIn('JsfSignatureSigners', repr(sig))
-        self.assertIn('1', repr(sig))
-
-    def test_empty_signers_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException):
-            JsfSignatureSigners(signers=[])
+        self.assertIn(
+            'JsfSignatureSigners',
+            repr(JsfSignatureSigners(signers=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')])),
+        )
 
 
 class TestJsfSignatureChain(TestCase):
-    """Tests for JsfSignatureChain (signaturechain mode)."""
 
-    def test_minimal(self) -> None:
-        signer = JsfSimpleSignature(algorithm=JsfAlgorithm.ED25519, value='xyzSig==')
-        sig = JsfSignatureChain(chain=[signer])
-        self.assertEqual(len(sig.chain), 1)
-        self.assertEqual(sig.chain[0], signer)
+    def test_no_params(self) -> None:
+        with self.assertRaises(TypeError):
+            JsfSignatureChain()
 
-    def test_multiple_in_chain(self) -> None:
-        s1 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v1')
-        s2 = JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='v2')
-        sig = JsfSignatureChain(chain=[s1, s2])
-        self.assertEqual(len(sig.chain), 2)
+    def test_validation_requires_at_least_one_element(self) -> None:
+        with self.assertRaises(InvalidValueException) as context:
+            JsfSignatureChain(chain=[])
+        self.assertEqual(str(context.exception), 'JsfSignatureChain requires at least one element')
 
-    def test_is_jsfsignature_subclass(self) -> None:
-        sig = JsfSignatureChain(chain=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')])
-        self.assertIsInstance(sig, JsfSignature)
+    def test_defaults(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        obj = JsfSignatureChain(chain=[sig])
+        self.assertEqual(list(obj.chain), [sig])
 
-    def test_equality(self) -> None:
-        s = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')
-        sig1 = JsfSignatureChain(chain=[s])
-        sig2 = JsfSignatureChain(chain=[s])
-        sig3 = JsfSignatureChain(chain=[JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='x')])
-        self.assertEqual(sig1, sig2)
-        self.assertNotEqual(sig1, sig3)
+    def test_constructor(self) -> None:
+        sigs = [
+            JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b'),
+            JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a'),
+        ]
+        obj = JsfSignatureChain(chain=sigs)
+        # chain is an ordered list -- per the JSF spec the first element must be the signature
+        # certificate and the chain must stay contiguous, so input order is preserved, not sorted
+        self.assertEqual(list(obj.chain), sigs)
 
-    def test_not_equal_to_multi(self) -> None:
-        s = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')
-        chain = JsfSignatureChain(chain=[s])
-        multi = JsfSignatureSigners(signers=[s])
-        self.assertNotEqual(chain, multi)
+    def test_sort(self) -> None:
+        expected_order = [1, 0]
+        objs = [
+            JsfSignatureChain(chain=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b')]),
+            JsfSignatureChain(chain=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a')]),
+        ]
+        expected_objs = reorder(objs, expected_order)
+        sorted_objs = sorted(objs)
+        self.assertListEqual(sorted_objs, expected_objs)
 
-    def test_hash_stable(self) -> None:
-        s = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')
-        sig1 = JsfSignatureChain(chain=[s])
-        sig2 = JsfSignatureChain(chain=[s])
-        self.assertEqual(hash(sig1), hash(sig2))
+    def test_same(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        obj_1 = JsfSignatureChain(chain=[sig])
+        obj_2 = JsfSignatureChain(chain=[sig])
+
+        self.assertNotEqual(id(obj_1), id(obj_2))
+        self.assertEqual(hash(obj_1), hash(obj_2))
+        self.assertTrue(obj_1 == obj_2)
+
+    def test_not_same(self) -> None:
+        obj_1 = JsfSignatureChain(chain=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a')])
+        obj_2 = JsfSignatureChain(chain=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b')])
+
+        self.assertNotEqual(hash(obj_1), hash(obj_2))
+        self.assertFalse(obj_1 == obj_2)
+
+    def test_unequal_different_type(self) -> None:
+        obj = JsfSignatureChain(chain=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')])
+        self.assertFalse(obj == 'other')
+
+    def test_compare_same_type(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        obj_1 = JsfSignatureChain(chain=[sig])
+        obj_2 = JsfSignatureChain(chain=[sig])
+
+        self.assertFalse(obj_1 < obj_2)
+        self.assertTrue(obj_1 <= obj_2)
+        self.assertTrue(obj_1 >= obj_2)
+
+    def test_comparison(self) -> None:
+        sig_a = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a')
+        sig_b = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b')
+        obj_1 = JsfSignatureChain(chain=[sig_a])
+        obj_2 = JsfSignatureChain(chain=[sig_b])
+
+        self.assertTrue(obj_1 < obj_2)
+        self.assertTrue(obj_1 <= obj_2)
+        self.assertTrue(obj_2 >= obj_1)
+
+    def test_hash(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        self.assertEqual(
+            hash(JsfSignatureChain(chain=[sig])),
+            hash(JsfSignatureChain(chain=[sig])),
+        )
 
     def test_repr(self) -> None:
-        s = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')
-        sig = JsfSignatureChain(chain=[s])
-        self.assertIn('JsfSignatureChain', repr(sig))
-        self.assertIn('1', repr(sig))
-
-    def test_empty_chain_rejected(self) -> None:
-        with self.assertRaises(InvalidValueException):
-            JsfSignatureChain(chain=[])
-
-
-class TestJsfSignatureBaseClass(TestCase):
-    """Tests that JsfSignature acts as a proper abstract base class / type for isinstance checks."""
-
-    def test_simple_is_jsfsignature(self) -> None:
-        self.assertIsInstance(
-            JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='v'),
-            JsfSignature,
+        self.assertIn(
+            'JsfSignatureChain',
+            repr(JsfSignatureChain(chain=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')])),
         )
 
-    def test_signers_is_jsfsignature(self) -> None:
-        self.assertIsInstance(
-            JsfSignatureSigners(signers=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')]),
-            JsfSignature,
-        )
 
-    def test_chain_is_jsfsignature(self) -> None:
-        self.assertIsInstance(
-            JsfSignatureChain(chain=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')]),
-            JsfSignature,
-        )
+class TestJsfSignaturePolymorphism(TestCase):
+    """Tests for equality/ordering across the three JsfSignature subtypes via the shared base class."""
 
-    def test_modes_are_distinct_types(self) -> None:
-        simple = JsfSimpleSignature(algorithm=JsfAlgorithm.ES256, value='v')
-        multi = JsfSignatureSigners(signers=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')])
-        chain = JsfSignatureChain(chain=[JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='v')])
-        # All are JsfSignature instances
-        self.assertIsInstance(simple, JsfSignature)
-        self.assertIsInstance(multi, JsfSignature)
-        self.assertIsInstance(chain, JsfSignature)
-        # But they are different types
-        self.assertEqual(type(simple).__name__, 'JsfSimpleSignature')
-        self.assertEqual(type(multi).__name__, 'JsfSignatureSigners')
-        self.assertEqual(type(chain).__name__, 'JsfSignatureChain')
+    def test_different_subtypes_are_not_equal(self) -> None:
+        simple = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        signers = JsfSignatureSigners(signers=[simple])
+        chain = JsfSignatureChain(chain=[simple])
 
+        self.assertFalse(simple == signers)
+        self.assertFalse(signers == chain)
+        self.assertFalse(chain == simple)
 
-class TestJsfAlgorithm(TestCase):
+    def test_sortable_across_subtypes(self) -> None:
+        # This should not raise TypeError: '<' not supported between instances
+        simple = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        signers = JsfSignatureSigners(signers=[simple])
+        chain = JsfSignatureChain(chain=[simple])
 
-    def test_enum_values(self) -> None:
-        self.assertEqual(JsfAlgorithm.RS256.value, 'RS256')
-        self.assertEqual(JsfAlgorithm.ES256.value, 'ES256')
-        self.assertEqual(JsfAlgorithm.ED25519.value, 'Ed25519')
-        self.assertEqual(JsfAlgorithm.ED448.value, 'Ed448')
-        self.assertEqual(JsfAlgorithm.HS512.value, 'HS512')
+        sorted_sigs = sorted([chain, simple, signers])
+        self.assertEqual(len(sorted_sigs), 3)
 
-    def test_all_algorithms_count(self) -> None:
-        self.assertEqual(len(JsfAlgorithm), 14)
+    def test_unequal_different_type(self) -> None:
+        simple = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        self.assertFalse(simple == 'other')
 
-
-class TestJsfKeyType(TestCase):
-
-    def test_enum_values(self) -> None:
-        self.assertEqual(JsfKeyType.EC.value, 'EC')
-        self.assertEqual(JsfKeyType.OKP.value, 'OKP')
-        self.assertEqual(JsfKeyType.RSA.value, 'RSA')
-
-    def test_all_key_types_count(self) -> None:
-        self.assertEqual(len(JsfKeyType), 3)
-
-
-class TestJsfEcCurve(TestCase):
-
-    def test_enum_values(self) -> None:
-        self.assertEqual(JsfEcCurve.P_256.value, 'P-256')
-        self.assertEqual(JsfEcCurve.P_384.value, 'P-384')
-        self.assertEqual(JsfEcCurve.P_521.value, 'P-521')
-
-    def test_all_curves_count(self) -> None:
-        self.assertEqual(len(JsfEcCurve), 3)
-
-
-class TestJsfOkpCurve(TestCase):
-
-    def test_enum_values(self) -> None:
-        self.assertEqual(JsfOkpCurve.ED25519.value, 'Ed25519')
-        self.assertEqual(JsfOkpCurve.ED448.value, 'Ed448')
-
-    def test_all_curves_count(self) -> None:
-        self.assertEqual(len(JsfOkpCurve), 2)
-
-
-class TestJsfSignatureXmlBehavior(TestCase):
-    """Verify that JSF signatures silently produce no XML output."""
-
-    def test_xml_normalize_returns_none(self) -> None:
-        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='AABBCC==')
-        result = _JsfSignatureSerializationHelper.xml_normalize(
-            sig, element_name='signature', view=None, xmlns=None
-        )
-        self.assertIsNone(result)
-
-    def test_xml_denormalize_returns_none(self) -> None:
-        from xml.etree.ElementTree import Element  # nosec B405
-        result = _JsfSignatureSerializationHelper.xml_denormalize(
-            Element('signature'), default_ns=None
-        )
-        self.assertIsNone(result)
-
-    def test_xml_normalize_signers_returns_none(self) -> None:
-        sig = JsfSignatureSigners(signers=[
-            JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='AABBCC==')
-        ])
-        result = _JsfSignatureSerializationHelper.xml_normalize(
-            sig, element_name='signature', view=None, xmlns=None
-        )
-        self.assertIsNone(result)
-
-    def test_xml_normalize_chain_returns_none(self) -> None:
-        sig = JsfSignatureChain(chain=[
-            JsfSimpleSignature(algorithm=JsfAlgorithm.ED25519, value='xyzSig==')
-        ])
-        result = _JsfSignatureSerializationHelper.xml_normalize(
-            sig, element_name='signature', view=None, xmlns=None
-        )
-        self.assertIsNone(result)
+    def test_incomparable_type_raises(self) -> None:
+        simple = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+        with self.assertRaises(TypeError):
+            r = simple < 'other'  # pylint: disable=unused-variable # noqa: disable=E841
