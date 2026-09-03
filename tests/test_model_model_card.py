@@ -245,9 +245,14 @@ class TestModelParameters(TestCase):
         self.assertEqual(obj.architecture_family, 'cnn')
         self.assertEqual(obj.model_architecture, 'resnet')
 
-    def test_dataset_not_supported(self) -> None:
-        with self.assertRaises(NotImplementedError):
-            ModelParameters(datasets=['dataset'])
+    def test_datasets(self) -> None:
+        inline = ComponentData(type=ComponentDataKind.DATASET, name='inline-dataset')
+        ref = DatasetReference(ref='data-1')
+
+        obj = ModelParameters(datasets=[inline, ref])
+
+        self.assertIn(inline, obj.datasets)
+        self.assertIn(ref, obj.datasets)
 
     def test_sorted_input_collection(self) -> None:
         first = InputOutputMLParameters(format='A')
