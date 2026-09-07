@@ -188,8 +188,8 @@ class ModelParameters:
         # This library has not yet implemented component.data (#913). To avoid emitting
         # invalid or partial structures, any attempt to populate datasets is rejected.
         if datasets is not None:
-            datasets_list = list(datasets)
-            if len(datasets_list) > 0:
+            sentinel = object()
+            if next(iter(datasets), sentinel) is not sentinel:
                 raise NotImplementedError(
                     'modelParameters.datasets is not yet supported. Tracked by issue #913.'
                 )
