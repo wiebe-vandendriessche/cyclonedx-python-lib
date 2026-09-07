@@ -109,7 +109,9 @@ from cyclonedx.model.release_note import ReleaseNotes
 from cyclonedx.model.service import Service
 from cyclonedx.model.signature import (
     JsfAlgorithm,
+    JsfEcCurve,
     JsfKeyType,
+    JsfOkpCurve,
     JsfPublicKey,
     JsfSignatureChain,
     JsfSignatureSigners,
@@ -1614,27 +1616,41 @@ def get_bom_for_issue540_duplicate_components() -> Bom:
 
 
 def get_bom_with_signatures() -> Bom:
-    # Tests JSF signature support on Bom, Component, and Service (JSON-only, CDX >= 1.4)
+    # Tests all JSF signature modes, key types, and optional fields (JSON-only, CDX >= 1.4).
     simple_sig = JsfSimpleSignature(
-        algorithm=JsfAlgorithm.ES256,
-        value='MEQCIAJ9DECTPNuqwdWHlHO3EB1jYVnjW7HZ0T7x3QIDO4OMfAIgTFz5kl3Zl7nBP4r2TovMnbJo3ij6JTANcFAQQVEBZQ==',
+        algorithm=XsUri('urn:example:signature-algorithm'),
+        value='simple-signature',
         key_id='test-key-1',
+        public_key=JsfPublicKey(
+            kty=JsfKeyType.EC,
+            crv=JsfEcCurve.P_256,
+            x='ec-coordinate-x',
+            y='ec-coordinate-y',
+        ),
+        certificate_path=['ec-certificate'],
+        excludes=['signature'],
     )
     multi_sig = JsfSignatureSigners(
         signers=[
             JsfSimpleSignature(
                 algorithm=JsfAlgorithm.RS256,
-                value='AABBCC==',
+                value='rsa-signature',
                 public_key=JsfPublicKey(
                     kty=JsfKeyType.RSA,
-                    n='sQ3MDBw==',
-                    e='AQAB',
+                    n='rsa-modulus',
+                    e='rsa-exponent',
                 ),
             ),
             JsfSimpleSignature(
                 algorithm=JsfAlgorithm.ES384,
-                value='DDEEFF==',
-                certificate_path=['MIICpDCCAYwCCQDU'],
+                value='okp-signature',
+                public_key=JsfPublicKey(
+                    kty=JsfKeyType.OKP,
+                    crv=JsfOkpCurve.ED25519,
+                    x='okp-coordinate-x',
+                ),
+                key_id='okp-key',
+                certificate_path=['okp-certificate'],
                 excludes=['signature'],
             ),
         ]
@@ -1657,8 +1673,12 @@ def get_bom_with_signatures() -> Bom:
                     chain=[
                         JsfSimpleSignature(
                             algorithm=JsfAlgorithm.ED25519,
-                            value='xyzSig==',
-                        )
+                            value='chain-signature-1',
+                        ),
+                        JsfSimpleSignature(
+                            algorithm=JsfAlgorithm.ED448,
+                            value='chain-signature-2',
+                        ),
                     ]
                 ),
             )

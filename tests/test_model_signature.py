@@ -18,6 +18,7 @@
 from unittest import TestCase
 
 from cyclonedx.exception.model import InvalidValueException
+from cyclonedx.model import XsUri
 from cyclonedx.model.signature import (
     JsfAlgorithm,
     JsfEcCurve,
@@ -243,6 +244,30 @@ class TestJsfPublicKey(TestCase):
         with self.assertRaises(InvalidValueException):
             JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent', y='bar')
 
+    def test_empty_key_values_are_allowed_by_schema(self) -> None:
+        self.assertEqual(
+            JsfPublicKey(kty=JsfKeyType.EC, crv=JsfEcCurve.P_256, x='', y='')._as_dict(),
+            {'kty': 'EC', 'crv': 'P-256', 'x': '', 'y': ''},
+        )
+        self.assertEqual(
+            JsfPublicKey(kty=JsfKeyType.RSA, n='', e='')._as_dict(),
+            {'kty': 'RSA', 'n': '', 'e': ''},
+        )
+
+    def test_from_dict_rejects_incompatible_fields(self) -> None:
+        cases = (
+            {'kty': 'RSA', 'n': 'n', 'e': 'e', 'crv': 'P-256'},
+            {'kty': 'RSA', 'n': 'n', 'e': 'e', 'crv': None},
+            {'kty': 'RSA', 'n': 'n', 'e': 'e', 'x': 'x'},
+            {'kty': 'EC', 'crv': 'P-256', 'x': 'x', 'y': 'y', 'n': 'n'},
+            {'kty': 'EC', 'crv': 'P-256', 'x': 'x', 'y': 'y', 'e': None},
+            {'kty': 'OKP', 'crv': 'Ed25519', 'x': 'x', 'y': 'y'},
+            {'kty': 'OKP', 'crv': 'Ed25519', 'x': 'x', 'n': None},
+        )
+        for data in cases:
+            with self.subTest(data=data), self.assertRaises(InvalidValueException):
+                JsfPublicKey._from_dict(data)
+
     # -------------------------------------------------------------------------
     # Equality, Comparison, Hash & Sort Tests
     # -------------------------------------------------------------------------
@@ -267,16 +292,12 @@ class TestJsfPublicKey(TestCase):
         key_2 = JsfPublicKey(kty=JsfKeyType.RSA, n='modulus', e='exponent')
 
         self.assertFalse(key_1 < key_2)
-        self.assertTrue(key_1 <= key_2)
-        self.assertTrue(key_1 >= key_2)
 
     def test_comparison(self) -> None:
         key_1 = JsfPublicKey(kty=JsfKeyType.RSA, n='a', e='exponent')
         key_2 = JsfPublicKey(kty=JsfKeyType.RSA, n='b', e='exponent')
 
         self.assertTrue(key_1 < key_2)
-        self.assertTrue(key_1 <= key_2)
-        self.assertTrue(key_2 >= key_1)
 
     def test_sort(self) -> None:
         expected_order = [2, 1, 0]
@@ -325,16 +346,25 @@ class TestJsfSimpleSignature(TestCase):
 
     def test_create(self) -> None:
         sig_rs = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val1')
-        sig_proprietary = JsfSimpleSignature(algorithm='urn:ietf:rfc:8032', value='val2')
+        proprietary_algorithm = XsUri('urn:ietf:rfc:8032')
+        sig_proprietary = JsfSimpleSignature(algorithm=proprietary_algorithm, value='val2')
         self.assertIs(JsfAlgorithm.RS256, sig_rs.algorithm)
-        # a proprietary algorithm URI that does not match a known JsfAlgorithm is kept as-is
-        self.assertEqual('urn:ietf:rfc:8032', sig_proprietary.algorithm)
+        self.assertEqual(proprietary_algorithm, sig_proprietary.algorithm)
 
     def test_update(self) -> None:
         sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
         self.assertIs(JsfAlgorithm.RS256, sig.algorithm)
-        sig.algorithm = JsfOkpCurve.ED25519
-        self.assertIs(JsfOkpCurve.ED25519, sig.algorithm)
+        sig.algorithm = JsfAlgorithm.ED25519
+        self.assertIs(JsfAlgorithm.ED25519, sig.algorithm)
+
+    def test_update_rejects_invalid_algorithm(self) -> None:
+        sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
+
+        for algorithm in ('not-a-uri', JsfKeyType.RSA):
+            with self.subTest(algorithm=algorithm), self.assertRaises(InvalidValueException):
+                sig.algorithm = algorithm  # type: ignore[assignment]
+
+        self.assertIs(JsfAlgorithm.RS256, sig.algorithm)
 
     def test_sort(self) -> None:
         expected_order = [1, 0]
@@ -350,13 +380,19 @@ class TestJsfSimpleSignature(TestCase):
         with self.assertRaises(TypeError):
             JsfSimpleSignature()
 
-    def test_validation_proprietary_algorithm_requires_uri(self) -> None:
-        with self.assertRaises(InvalidValueException) as context:
-            JsfSimpleSignature(algorithm='not-a-uri', value='val')
-        self.assertEqual(
-            str(context.exception),
-            "Proprietary JSF algorithm must be expressed as a URI, got 'not-a-uri'"
+    def test_from_dict(self) -> None:
+        self.assertIs(
+            JsfAlgorithm.ES256,
+            JsfSimpleSignature._from_dict({'algorithm': 'ES256', 'value': 'val'}).algorithm,
         )
+        self.assertEqual(
+            XsUri('urn:example:algorithm'),
+            JsfSimpleSignature._from_dict({'algorithm': 'urn:example:algorithm', 'value': 'val'}).algorithm,
+        )
+
+    def test_proprietary_algorithm_requires_absolute_uri(self) -> None:
+        with self.assertRaises(InvalidValueException):
+            JsfSimpleSignature(algorithm=XsUri('relative-algorithm'), value='val')
 
     def test_same(self) -> None:
         sig_1 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
@@ -382,16 +418,12 @@ class TestJsfSimpleSignature(TestCase):
         sig_2 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
 
         self.assertFalse(sig_1 < sig_2)
-        self.assertTrue(sig_1 <= sig_2)
-        self.assertTrue(sig_1 >= sig_2)
 
     def test_comparison(self) -> None:
         sig_1 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a')
         sig_2 = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='b')
 
         self.assertTrue(sig_1 < sig_2)
-        self.assertTrue(sig_1 <= sig_2)
-        self.assertTrue(sig_2 >= sig_1)
 
     def test_repr(self) -> None:
         sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
@@ -411,10 +443,15 @@ class TestJsfSignatureSigners(TestCase):
         with self.assertRaises(TypeError):
             JsfSignatureSigners()
 
-    def test_validation_requires_at_least_one_signer(self) -> None:
-        with self.assertRaises(InvalidValueException) as context:
-            JsfSignatureSigners(signers=[])
-        self.assertEqual(str(context.exception), 'JsfSignatureSigners requires at least one signer')
+    def test_empty_signers_allowed_by_schema(self) -> None:
+        obj = JsfSignatureSigners._from_dict({'signers': []})
+
+        self.assertEqual([], obj.signers)
+        self.assertEqual({'signers': []}, obj._as_dict())
+
+    def test_rejects_non_simple_signature(self) -> None:
+        with self.assertRaisesRegex(InvalidValueException, 'signers must contain only JsfSimpleSignature instances'):
+            JsfSignatureSigners(signers=[JsfSignatureChain(chain=[])])  # type: ignore[list-item]
 
     def test_defaults(self) -> None:
         sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
@@ -466,8 +503,6 @@ class TestJsfSignatureSigners(TestCase):
         obj_2 = JsfSignatureSigners(signers=[sig])
 
         self.assertFalse(obj_1 < obj_2)
-        self.assertTrue(obj_1 <= obj_2)
-        self.assertTrue(obj_1 >= obj_2)
 
     def test_comparison(self) -> None:
         sig_a = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a')
@@ -476,8 +511,6 @@ class TestJsfSignatureSigners(TestCase):
         obj_2 = JsfSignatureSigners(signers=[sig_b])
 
         self.assertTrue(obj_1 < obj_2)
-        self.assertTrue(obj_1 <= obj_2)
-        self.assertTrue(obj_2 >= obj_1)
 
     def test_hash(self) -> None:
         sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
@@ -499,10 +532,15 @@ class TestJsfSignatureChain(TestCase):
         with self.assertRaises(TypeError):
             JsfSignatureChain()
 
-    def test_validation_requires_at_least_one_element(self) -> None:
-        with self.assertRaises(InvalidValueException) as context:
-            JsfSignatureChain(chain=[])
-        self.assertEqual(str(context.exception), 'JsfSignatureChain requires at least one element')
+    def test_empty_chain_allowed_by_schema(self) -> None:
+        obj = JsfSignatureChain._from_dict({'chain': []})
+
+        self.assertEqual([], obj.chain)
+        self.assertEqual({'chain': []}, obj._as_dict())
+
+    def test_rejects_non_simple_signature(self) -> None:
+        with self.assertRaisesRegex(InvalidValueException, 'chain must contain only JsfSimpleSignature instances'):
+            JsfSignatureChain(chain=[JsfSignatureSigners(signers=[])])  # type: ignore[list-item]
 
     def test_defaults(self) -> None:
         sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')
@@ -555,8 +593,6 @@ class TestJsfSignatureChain(TestCase):
         obj_2 = JsfSignatureChain(chain=[sig])
 
         self.assertFalse(obj_1 < obj_2)
-        self.assertTrue(obj_1 <= obj_2)
-        self.assertTrue(obj_1 >= obj_2)
 
     def test_comparison(self) -> None:
         sig_a = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='a')
@@ -565,8 +601,6 @@ class TestJsfSignatureChain(TestCase):
         obj_2 = JsfSignatureChain(chain=[sig_b])
 
         self.assertTrue(obj_1 < obj_2)
-        self.assertTrue(obj_1 <= obj_2)
-        self.assertTrue(obj_2 >= obj_1)
 
     def test_hash(self) -> None:
         sig = JsfSimpleSignature(algorithm=JsfAlgorithm.RS256, value='val')

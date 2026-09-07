@@ -4,9 +4,21 @@
       "bom-ref": "acme-library",
       "name": "acme-library",
       "signature": {
-        "algorithm": "ES256",
-        "value": "MEQCIAJ9DECTPNuqwdWHlHO3EB1jYVnjW7HZ0T7x3QIDO4OMfAIgTFz5kl3Zl7nBP4r2TovMnbJo3ij6JTANcFAQQVEBZQ==",
-        "keyId": "test-key-1"
+        "algorithm": "urn:example:signature-algorithm",
+        "value": "simple-signature",
+        "keyId": "test-key-1",
+        "publicKey": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "ec-coordinate-x",
+          "y": "ec-coordinate-y"
+        },
+        "certificatePath": [
+          "ec-certificate"
+        ],
+        "excludes": [
+          "signature"
+        ]
       },
       "type": "library",
       "version": "1.2.3"
@@ -41,7 +53,11 @@
         "chain": [
           {
             "algorithm": "Ed25519",
-            "value": "xyzSig=="
+            "value": "chain-signature-1"
+          },
+          {
+            "algorithm": "Ed448",
+            "value": "chain-signature-2"
           }
         ]
       }
@@ -51,18 +67,24 @@
     "signers": [
       {
         "algorithm": "RS256",
-        "value": "AABBCC==",
+        "value": "rsa-signature",
         "publicKey": {
           "kty": "RSA",
-          "n": "sQ3MDBw==",
-          "e": "AQAB"
+          "n": "rsa-modulus",
+          "e": "rsa-exponent"
         }
       },
       {
         "algorithm": "ES384",
-        "value": "DDEEFF==",
+        "value": "okp-signature",
+        "keyId": "okp-key",
+        "publicKey": {
+          "kty": "OKP",
+          "crv": "Ed25519",
+          "x": "okp-coordinate-x"
+        },
         "certificatePath": [
-          "MIICpDCCAYwCCQDU"
+          "okp-certificate"
         ],
         "excludes": [
           "signature"

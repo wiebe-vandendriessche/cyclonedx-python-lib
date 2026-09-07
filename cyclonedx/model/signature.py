@@ -40,6 +40,7 @@ import py_serializable as serializable
 
 from .._internal.compare import ComparableTuple as _ComparableTuple
 from ..exception.model import InvalidValueException
+from . import XsUri
 
 
 @serializable.serializable_enum
@@ -49,9 +50,8 @@ class JsfAlgorithm(str, Enum):
 
     Note: Unlike RFC8037, JSF requires explicit Ed* algorithm names instead of "EdDSA".
 
-    For proprietary algorithms, pass a URI string directly — the ``algorithm`` field on
-    :class:`JsfSignature`, :class:`JsfSignatureSigners`, and :class:`JsfSignatureChain`
-    accepts both :class:`JsfAlgorithm` enum values and arbitrary strings.
+    For proprietary algorithms, pass an absolute :class:`~cyclonedx.model.XsUri` to
+    :class:`JsfSimpleSignature`.
     """
 
     RS256 = 'RS256'
@@ -106,26 +106,12 @@ class JsfOkpCurve(str, Enum):
     ED448 = 'Ed448'
 
 
-def _coerce_ec_crv(crv: Union[JsfEcCurve, str]) -> JsfEcCurve:
-    if isinstance(crv, JsfEcCurve):
-        return crv
-    try:
-        return JsfEcCurve(crv)
-    except ValueError:
-        raise InvalidValueException(
-            f'EC public key crv must be one of {[c.value for c in JsfEcCurve]!r}, got {crv!r}'
-        ) from None
-
-
-def _coerce_okp_crv(crv: Union[JsfOkpCurve, str]) -> JsfOkpCurve:
-    if isinstance(crv, JsfOkpCurve):
-        return crv
-    try:
-        return JsfOkpCurve(crv)
-    except ValueError:
-        raise InvalidValueException(
-            f'OKP public key crv must be one of {[c.value for c in JsfOkpCurve]!r}, got {crv!r}'
-        ) from None
+# Fields each JSF public-key type must not carry, per the JSF schema (`additionalProperties: false`).
+_FORBIDDEN_PUBLIC_KEY_FIELDS: 'dict[JsfKeyType, tuple[str, ...]]' = {
+    JsfKeyType.EC: ('n', 'e'),
+    JsfKeyType.OKP: ('y', 'n', 'e'),
+    JsfKeyType.RSA: ('crv', 'x', 'y'),
+}
 
 
 def _check_no_rsa_fields(kty: JsfKeyType, n: Optional[str], e: Optional[str]) -> None:
@@ -173,7 +159,7 @@ class JsfPublicKey:
     ) -> None:
         # Validate conditional schema requirements per JSF spec
         if kty == JsfKeyType.EC:
-            if not (crv and x and y):
+            if crv is None or x is None or y is None:
                 raise InvalidValueException('EC public key requires crv, x, and y')
             if not isinstance(crv, JsfEcCurve):
                 raise InvalidValueException(
@@ -181,7 +167,7 @@ class JsfPublicKey:
                 )
             _check_no_rsa_fields(kty, n, e)
         elif kty == JsfKeyType.OKP:
-            if not (crv and x):
+            if crv is None or x is None:
                 raise InvalidValueException('OKP public key requires crv and x')
             if not isinstance(crv, JsfOkpCurve):
                 raise InvalidValueException(
@@ -190,7 +176,7 @@ class JsfPublicKey:
             _check_no_y_field(y)
             _check_no_rsa_fields(kty, n, e)
         elif kty == JsfKeyType.RSA:
-            if not (n and e):
+            if n is None or e is None:
                 raise InvalidValueException('RSA public key requires n and e')
             _check_no_ec_okp_fields(crv, x, y)
 
@@ -218,13 +204,16 @@ class JsfPublicKey:
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> 'JsfPublicKey':
         kty = JsfKeyType(d['kty'])
+        forbidden = _FORBIDDEN_PUBLIC_KEY_FIELDS[kty]
+        if any(field in d for field in forbidden):
+            raise InvalidValueException(f'{kty.value} public key must not include fields: {", ".join(forbidden)}')
         crv_raw = d.get('crv')
         crv: Optional[Union[JsfEcCurve, JsfOkpCurve]] = None
         if crv_raw is not None:
             if kty == JsfKeyType.EC:
-                crv = _coerce_ec_crv(crv_raw)
+                crv = JsfEcCurve(crv_raw)
             elif kty == JsfKeyType.OKP:
-                crv = _coerce_okp_crv(crv_raw)
+                crv = JsfOkpCurve(crv_raw)
         return cls(kty=kty, crv=crv, x=d.get('x'), y=d.get('y'), n=d.get('n'), e=d.get('e'))
 
     def __comparable_tuple(self) -> _ComparableTuple:
@@ -238,16 +227,6 @@ class JsfPublicKey:
     def __lt__(self, other: Any) -> bool:
         if isinstance(other, JsfPublicKey):
             return self.__comparable_tuple() < other.__comparable_tuple()
-        return NotImplemented
-
-    def __le__(self, other: Any) -> bool:
-        if isinstance(other, JsfPublicKey):
-            return self.__comparable_tuple() <= other.__comparable_tuple()
-        return NotImplemented
-
-    def __ge__(self, other: Any) -> bool:
-        if isinstance(other, JsfPublicKey):
-            return self.__comparable_tuple() >= other.__comparable_tuple()
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -298,16 +277,6 @@ class JsfSignature(ABC):
             return _JsfSignatureSerializationHelper._sort_key(self) < _JsfSignatureSerializationHelper._sort_key(other)
         return NotImplemented
 
-    def __le__(self, other: Any) -> bool:
-        if isinstance(other, JsfSignature):
-            return _JsfSignatureSerializationHelper._sort_key(self) <= _JsfSignatureSerializationHelper._sort_key(other)
-        return NotImplemented
-
-    def __ge__(self, other: Any) -> bool:
-        if isinstance(other, JsfSignature):
-            return _JsfSignatureSerializationHelper._sort_key(self) >= _JsfSignatureSerializationHelper._sort_key(other)
-        return NotImplemented
-
     def __hash__(self) -> int:
         return hash(_JsfSignatureSerializationHelper._sort_key(self))
 
@@ -322,25 +291,31 @@ class JsfSimpleSignature(JsfSignature):
 
     def __init__(
         self, *,
-        algorithm: Union[JsfAlgorithm, str],
+        algorithm: Union[JsfAlgorithm, XsUri],
         value: str,
         key_id: Optional[str] = None,
         public_key: Optional[JsfPublicKey] = None,
         certificate_path: Optional[list[str]] = None,
         excludes: Optional[list[str]] = None,
     ) -> None:
-        if not isinstance(algorithm, JsfAlgorithm):
-            # Proprietary algorithms must be expressed as URIs per JSF spec
-            if not _urlsplit(str(algorithm)).scheme:
-                raise InvalidValueException(
-                    f'Proprietary JSF algorithm must be expressed as a URI, got {algorithm!r}'
-                )
         self.algorithm = algorithm
         self.value = value
         self.key_id = key_id
         self.public_key = public_key
-        self.certificate_path = list(certificate_path) if certificate_path else []
-        self.excludes = list(excludes) if excludes else []
+        self.certificate_path = list(certificate_path or [])
+        self.excludes = list(excludes or [])
+
+    @property
+    def algorithm(self) -> Union[JsfAlgorithm, XsUri]:
+        return self._algorithm
+
+    @algorithm.setter
+    def algorithm(self, algorithm: Union[JsfAlgorithm, XsUri]) -> None:
+        if not isinstance(algorithm, (JsfAlgorithm, XsUri)):
+            raise InvalidValueException('algorithm must be a JsfAlgorithm or XsUri instance')
+        if isinstance(algorithm, XsUri) and not _urlsplit(str(algorithm)).scheme:
+            raise InvalidValueException(f'Proprietary JSF algorithm must be an absolute URI, got {algorithm!r}')
+        self._algorithm = algorithm
 
     def _as_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -359,11 +334,10 @@ class JsfSimpleSignature(JsfSignature):
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> 'JsfSimpleSignature':
-        algorithm: Union[JsfAlgorithm, str]
         try:
-            algorithm = JsfAlgorithm(d['algorithm'])
+            algorithm: Union[JsfAlgorithm, XsUri] = JsfAlgorithm(d['algorithm'])
         except ValueError:
-            algorithm = d['algorithm']
+            algorithm = XsUri(d['algorithm'])
         pk = d.get('publicKey')
         return cls(
             algorithm=algorithm,
@@ -386,8 +360,8 @@ class JsfSignatureSigners(JsfSignature):
     """
 
     def __init__(self, *, signers: list['JsfSimpleSignature']) -> None:
-        if not signers:
-            raise InvalidValueException('JsfSignatureSigners requires at least one signer')
+        if not all(isinstance(signer, JsfSimpleSignature) for signer in signers):
+            raise InvalidValueException('signers must contain only JsfSimpleSignature instances')
         self.signers = list(signers)
 
     def _as_dict(self) -> dict[str, Any]:
@@ -409,8 +383,8 @@ class JsfSignatureChain(JsfSignature):
     """
 
     def __init__(self, *, chain: list['JsfSimpleSignature']) -> None:
-        if not chain:
-            raise InvalidValueException('JsfSignatureChain requires at least one element')
+        if not all(isinstance(signature, JsfSimpleSignature) for signature in chain):
+            raise InvalidValueException('chain must contain only JsfSimpleSignature instances')
         self.chain = list(chain)
 
     def _as_dict(self) -> dict[str, Any]:
@@ -454,6 +428,8 @@ class _JsfSignatureSerializationHelper(serializable.helpers.BaseHelper):
     def json_denormalize(cls, o: Any, **__: Any) -> JsfSignature:
         if not isinstance(o, dict):
             raise TypeError(f'Expected dict, got {type(o)!r}')
+        if 'signers' in o and 'chain' in o:
+            raise InvalidValueException('JSF signature cannot contain both signers and chain')
         if 'signers' in o:
             return JsfSignatureSigners._from_dict(o)
         if 'chain' in o:
